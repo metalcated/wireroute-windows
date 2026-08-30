@@ -11,4 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\WireRoute.Core\WireRoute.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Fixtures\sample-full.conf" Link="Fixtures\sample-full.conf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

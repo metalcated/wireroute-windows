@@ -5,20 +5,25 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using WireRoute.App.Models;
+using WireRoute.Core.Profiles;
+using WireRoute.Core.Routing;
 
 namespace WireRoute.App;
 
 public sealed partial class MainWindow : Window
 {
     private readonly AppWindow appWindow;
+    private readonly nint windowHandle;
 
     public MainWindow()
     {
         InitializeComponent();
         Profiles.CollectionChanged += (_, _) => UpdateProfilesEmptyState();
 
-        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
         appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureWindow();
@@ -51,13 +56,133 @@ public sealed partial class MainWindow : Window
         ProfilesEmptyState.Visibility = Profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private async void ImportProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImportProfileButton.IsEnabled = false;
+        try
+        {
+            var picker = new FileOpenPicker
+            {
+                CommitButtonText = "Import",
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                ViewMode = PickerViewMode.List,
+            };
+            picker.FileTypeFilter.Add(".conf");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+
+            var files = await picker.PickMultipleFilesAsync();
+            if (files.Count == 0)
+            {
+                return;
+            }
+
+            var failures = new List<string>();
+            ProfileNavigationItem? firstImportedItem = null;
+            foreach (var file in files)
+            {
+                var profileName = Path.GetFileNameWithoutExtension(file.Name).Trim();
+                if (Profiles.Any(item => item.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    failures.Add($"{file.Name}: A profile with this name is already open.");
+                    continue;
+                }
+
+                try
+                {
+                    var properties = await file.GetBasicPropertiesAsync();
+                    if (properties.Size > 1024 * 1024)
+                    {
+                        failures.Add($"{file.Name}: Configuration files must be 1 MB or smaller.");
+                        continue;
+                    }
+
+                    var text = await FileIO.ReadTextAsync(file);
+                    var profile = WireGuardConfigParser.Parse(text, profileName);
+                    var item = new ProfileNavigationItem(profile);
+                    Profiles.Add(item);
+                    firstImportedItem ??= item;
+                }
+                catch (WireGuardConfigParseException exception)
+                {
+                    failures.Add($"{file.Name}: {exception.Message}");
+                }
+                catch (Exception exception)
+                {
+                    failures.Add($"{file.Name}: {exception.Message}");
+                }
+            }
+
+            if (firstImportedItem is not null)
+            {
+                ProfilesList.SelectedItem = firstImportedItem;
+            }
+
+            if (failures.Count > 0)
+            {
+                var title = firstImportedItem is null ? "Profiles were not imported" : "Some profiles were not imported";
+                await ShowMessageAsync(title, string.Join("\n\n", failures));
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync("Unable to open profiles", exception.Message);
+        }
+        finally
+        {
+            ImportProfileButton.IsEnabled = true;
+        }
+    }
+
+    private void ProfilesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ProfilesList.SelectedItem is ProfileNavigationItem item)
+        {
+            ShowProfile(item.Profile);
+        }
+    }
+
+    private void ShowProfile(WireGuardProfile profile)
+    {
+        ProfileEmptyPanel.Visibility = Visibility.Collapsed;
+        ProfileDetailPanel.Visibility = Visibility.Visible;
+        RouterOSPanel.Visibility = Visibility.Collapsed;
+        SettingsPanel.Visibility = Visibility.Collapsed;
+        SetSelectedState(RouterOSButton, RouterOSRail, false);
+        SetSelectedState(SettingsButton, SettingsRail, false);
+
+        ProfileNameText.Text = profile.Name;
+        ProfileEndpointText.Text = DisplayList(
+            profile.Peers
+                .Select(peer => peer.Endpoint?.DisplayValue)
+                .Where(value => value is not null)
+                .Select(value => value!));
+        ProfileAddressesText.Text = DisplayList(profile.Interface.Addresses.Select(address => address.Notation));
+        ProfilePeersText.Text = profile.Peers.Count == 1 ? "1 peer" : $"{profile.Peers.Count} peers";
+        ProfileRoutingModeText.Text = profile.DetectedRouteMode == TunnelRouteMode.Full
+            ? "Full routing"
+            : "Split routing";
+        ProfileRoutesText.Text = DisplayList(profile.ImportedAllowedIps.Select(route => route.Notation));
+        ProfileDnsServersText.Text = DisplayList(profile.DnsRouteSummary.Servers.Select(server =>
+            $"{server.Address} — {(server.Route == DnsServerRoute.ThroughTunnel ? "Through tunnel" : "Outside tunnel")}"));
+        ProfileDnsSearchText.Text = DisplayList(profile.Interface.DnsSearchDomains);
+        HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static string DisplayList(IEnumerable<string> values)
+    {
+        var displayedValues = values.Distinct(StringComparer.Ordinal).ToArray();
+        return displayedValues.Length == 0 ? "Not specified" : string.Join("\n", displayedValues);
+    }
+
     private void RouterOSButton_Click(object sender, RoutedEventArgs e) => ShowDestination(Destination.RouterOS);
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => ShowDestination(Destination.Settings);
 
     private void ShowDestination(Destination destination)
     {
+        ProfilesList.SelectedItem = null;
         ProfileEmptyPanel.Visibility = destination == Destination.Profile ? Visibility.Visible : Visibility.Collapsed;
+        ProfileDetailPanel.Visibility = Visibility.Collapsed;
         RouterOSPanel.Visibility = destination == Destination.RouterOS ? Visibility.Visible : Visibility.Collapsed;
         SettingsPanel.Visibility = destination == Destination.Settings ? Visibility.Visible : Visibility.Collapsed;
 
@@ -76,6 +201,30 @@ public sealed partial class MainWindow : Window
             : new SolidColorBrush(ColorHelper.FromArgb(255, 243, 247, 252));
     }
 
+    private async Task ShowMessageAsync(string title, string message)
+    {
+        var content = new TextBlock
+        {
+            MaxWidth = 560,
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        await CreateDialog(title, content).ShowAsync();
+    }
+
+    private ContentDialog CreateDialog(string title, object content) => new()
+    {
+        XamlRoot = Root.XamlRoot,
+        Title = title,
+        Content = content,
+        Background = (Brush)Application.Current.Resources["NordicRaisedBrush"],
+        BorderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"],
+        BorderThickness = new Thickness(1),
+        CloseButtonText = "Done",
+        CloseButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
+        DefaultButton = ContentDialogButton.None,
+    };
+
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var content = new StackPanel { Spacing = 8 };
@@ -91,18 +240,7 @@ public sealed partial class MainWindow : Window
             TextWrapping = TextWrapping.Wrap,
         });
 
-        var dialog = new ContentDialog
-        {
-            XamlRoot = Root.XamlRoot,
-            Title = "About WireRoute",
-            Content = content,
-            Background = (Brush)Application.Current.Resources["NordicRaisedBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"],
-            BorderThickness = new Thickness(1),
-            CloseButtonText = "Done",
-            CloseButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
-            DefaultButton = ContentDialogButton.None,
-        };
+        var dialog = CreateDialog("About WireRoute", content);
         await dialog.ShowAsync();
     }
 

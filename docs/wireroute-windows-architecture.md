@@ -15,6 +15,14 @@
 5. Nordic Blue is the default visual system. System appearance remains required, but it is not enabled until every control has a complete system-theme resource path.
 6. Profile secrets remain in the existing DPAPI-protected store. The UI will receive redacted data unless an explicitly authorized workflow requires private material.
 
+## Current import boundary
+
+- The WinUI app can open one or more user-selected `.conf` files and validate them with the shared C# parser.
+- Parsed private and preshared keys remain internal to `WireRoute.Core`; the UI receives only presence flags and non-secret network metadata.
+- Imported profiles are session-only previews. They are not written to disk, registered with the manager, or made connectable.
+- Configurations containing `PreUp`, `PostUp`, `PreDown`, or `PostDown` are detected and visibly flagged. Preview never executes hooks.
+- The manager service, inherited handles, Go `gob` IPC, tunnel services, routes, DNS, registry, and installer remain unchanged by this slice.
+
 ## Reuse map
 
 | WireRoute capability | Existing Windows foundation | Planned Windows surface |
