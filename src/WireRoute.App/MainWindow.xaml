@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="WireRoute.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:WireRoute.App.Models"
+    Title="WireRoute">
+
+    <Grid x:Name="Root" Background="{StaticResource NordicCanvasBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="288" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.RowSpan="2" Background="{StaticResource NordicSidebarBrush}" />
+
+        <Grid x:Name="TitleBarDragRegion" Grid.ColumnSpan="2" Height="48">
+            <StackPanel Margin="18,0,0,0" VerticalAlignment="Center" Orientation="Horizontal" Spacing="10">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="17"
+                    Foreground="{StaticResource NordicAccentBrush}"
+                    Glyph="&#xE83B;" />
+                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="16" FontWeight="SemiBold" Text="WireRoute" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Padding="12,10,12,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Margin="8,4,8,10" Spacing="3">
+                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="20" FontWeight="SemiBold" Text="Profiles" />
+                <TextBlock
+                    Foreground="{StaticResource NordicSecondaryTextBrush}"
+                    FontSize="12"
+                    Text="Choose a profile to connect or change its routing."
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="1"
+                Margin="10,8,10,6"
+                Foreground="{StaticResource NordicTertiaryTextBrush}"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Text="PROFILES" />
+
+            <Grid Grid.Row="2">
+                <ListView
+                    x:Name="ProfilesList"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ItemsSource="{x:Bind Profiles}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:ProfileNavigationItem">
+                            <Grid Padding="10,7">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Width="7" Height="7" Fill="{StaticResource NordicTertiaryTextBrush}" />
+                                <StackPanel Grid.Column="1" Margin="10,0,8,0" Spacing="2">
+                                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                        FontSize="11"
+                                        Text="{x:Bind Status}" />
+                                </StackPanel>
+                                <Border
+                                    Grid.Column="2"
+                                    Padding="7,3"
+                                    Background="{StaticResource NordicInsetBrush}"
+                                    CornerRadius="5">
+                                    <TextBlock
+                                        Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                        FontSize="10"
+                                        Text="{x:Bind RoutingLabel}" />
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel
+                    x:Name="ProfilesEmptyState"
+                    Margin="18,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Spacing="5">
+                    <TextBlock HorizontalAlignment="Center" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="No profiles yet" />
+                    <TextBlock
+                        MaxWidth="210"
+                        HorizontalAlignment="Center"
+                        Foreground="{StaticResource NordicTertiaryTextBrush}"
+                        FontSize="11"
+                        Text="Import and protected storage arrive with the manager integration milestone."
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
+            <TextBlock
+                Grid.Row="3"
+                Margin="10,12,10,6"
+                Foreground="{StaticResource NordicTertiaryTextBrush}"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Text="MANAGE" />
+
+            <StackPanel Grid.Row="4" Spacing="3">
+                <Button x:Name="RouterOSButton" Click="RouterOSButton_Click" Style="{StaticResource SidebarActionButtonStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="20" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="RouterOSRail" Width="3" Height="20" Background="{StaticResource NordicAccentBrush}" CornerRadius="2" Visibility="Collapsed" />
+                        <FontIcon Grid.Column="1" FontFamily="Segoe Fluent Icons" FontSize="15" Glyph="&#xE950;" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" FontWeight="Normal" Text="RouterOS Peers" />
+                        <FontIcon Grid.Column="3" FontFamily="Segoe Fluent Icons" FontSize="11" Glyph="&#xE76C;" />
+                    </Grid>
+                </Button>
+                <Button x:Name="SettingsButton" Click="SettingsButton_Click" Style="{StaticResource SidebarActionButtonStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="20" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="SettingsRail" Width="3" Height="20" Background="{StaticResource NordicAccentBrush}" CornerRadius="2" Visibility="Collapsed" />
+                        <FontIcon Grid.Column="1" FontFamily="Segoe Fluent Icons" FontSize="15" Glyph="&#xE713;" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" FontWeight="Normal" Text="Settings" />
+                        <FontIcon Grid.Column="3" FontFamily="Segoe Fluent Icons" FontSize="11" Glyph="&#xE76C;" />
+                    </Grid>
+                </Button>
+            </StackPanel>
+
+            <Grid Grid.Row="5" Margin="0,12,0,0" ColumnSpacing="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button
+                    IsEnabled="False"
+                    Style="{StaticResource SidebarActionButtonStyle}"
+                    ToolTipService.ToolTip="Profile import is enabled after the protected manager boundary is connected.">
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <FontIcon FontFamily="Segoe Fluent Icons" FontSize="14" Glyph="&#xE710;" />
+                        <TextBlock Text="Add profile" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Style="{StaticResource SidebarActionButtonStyle}">
+                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="16" Glyph="&#xE712;" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem IsEnabled="False" Text="Export profiles…" />
+                            <MenuFlyoutItem IsEnabled="False" Text="View log…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="AboutMenuItem_Click" Text="About WireRoute" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+        </Grid>
+
+        <Grid Grid.Row="1" Grid.Column="1" Padding="36,28,36,36">
+            <Grid x:Name="ProfileEmptyPanel">
+                <StackPanel MaxWidth="620" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="18">
+                    <Border
+                        Width="64"
+                        Height="64"
+                        HorizontalAlignment="Center"
+                        Background="{StaticResource NordicSurfaceBrush}"
+                        BorderBrush="{StaticResource NordicBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="26"
+                            Foreground="{StaticResource NordicAccentBrush}"
+                            Glyph="&#xE83B;" />
+                    </Border>
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            FontFamily="Segoe UI Variable Display"
+                            FontSize="26"
+                            FontWeight="SemiBold"
+                            Text="Choose a profile" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Foreground="{StaticResource NordicSecondaryTextBrush}"
+                            Text="Select a WireGuard profile to view its connection, routing, DNS, and activity."
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontSize="15" Text="No profiles are available" />
+                            <TextBlock
+                                Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                FontSize="12"
+                                Text="The shell stays isolated from privileged tunnel data until the manager protocol is reviewed and connected."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <Grid x:Name="RouterOSPanel" Visibility="Collapsed">
+                <StackPanel MaxWidth="720" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="32" Foreground="{StaticResource NordicAccentBrush}" Glyph="&#xE950;" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        FontFamily="Segoe UI Variable Display"
+                        FontSize="26"
+                        FontWeight="SemiBold"
+                        Text="RouterOS Peers" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        Foreground="{StaticResource NordicSecondaryTextBrush}"
+                        Text="Read-only discovery, certificate review, and guarded peer setup will appear here after the core tunnel path is validated."
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="7">
+                            <TextBlock Text="No RouterOS connection selected" />
+                            <TextBlock
+                                Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                FontSize="12"
+                                Text="RouterOS writes remain unavailable until an exact change is reviewed and confirmed."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed">
+                <StackPanel MaxWidth="820" HorizontalAlignment="Center" Spacing="18">
+                    <StackPanel Spacing="5">
+                        <TextBlock FontFamily="Segoe UI Variable Display" FontSize="28" FontWeight="SemiBold" Text="Settings" />
+                        <TextBlock
+                            Foreground="{StaticResource NordicSecondaryTextBrush}"
+                            Text="Manage how WireRoute looks, stores local activity, and handles diagnostics and support."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="16">
+                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Appearance" />
+                            <Grid ColumnSpacing="24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="220" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Theme" />
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Nordic Blue is the default dark navy interface." />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" IsEnabled="False" SelectedIndex="0" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Nordic Blue" />
+                                    <ComboBoxItem Content="System" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnSpacing="24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="Windows tray icon" />
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Keep WireRoute available from the notification area." />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsEnabled="False" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="RouterOS Connections" />
+                            <TextBlock
+                                Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                FontSize="12"
+                                Text="Saved connections and passwords will use protected Windows credential storage. Read-only interface loading never changes RouterOS."
+                                TextWrapping="Wrap" />
+                            <Button IsEnabled="False" HorizontalAlignment="Left" Content="Add connection" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Data and diagnostics" />
+                            <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Activity stays on this device. Retention, logs, and export are connected in later milestones." TextWrapping="Wrap" />
+                            <Button IsEnabled="False" HorizontalAlignment="Left" Content="View logs and diagnostics" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

@@ -15,3 +15,11 @@
 *.syso
 .idea
 *.ico
+
+# Visual Studio and .NET
+/.vs
+**/bin/
+**/obj/
+**/AppPackages/
+*.user
+*.suo
