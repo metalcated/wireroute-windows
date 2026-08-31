@@ -201,6 +201,7 @@ public sealed partial class MainWindow : Window
                 ViewMode = PickerViewMode.List,
             };
             picker.FileTypeFilter.Add(".conf");
+            picker.FileTypeFilter.Add(".zip");
             WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
 
             var files = await picker.PickMultipleFilesAsync();
@@ -213,53 +214,47 @@ public sealed partial class MainWindow : Window
             ProfileNavigationItem? firstImportedItem = null;
             foreach (var file in files)
             {
-                var profileName = Path.GetFileNameWithoutExtension(file.Name).Trim();
-                if (Profiles.Any(item => item.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    failures.Add($"{file.Name}: A profile with this name is already open.");
-                    continue;
-                }
-
                 try
                 {
                     var properties = await file.GetBasicPropertiesAsync();
-                    if (properties.Size > 1024 * 1024)
+                    if (Path.GetExtension(file.Name).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (properties.Size > 64 * 1024 * 1024)
+                        {
+                            failures.Add($"{file.Name}: Tunnel archives must be 64 MB or smaller.");
+                            continue;
+                        }
+                        using var stream = await file.OpenStreamForReadAsync();
+                        var archiveEntries = WireGuardProfileArchiveReader.Read(stream, file.Name);
+                        if (archiveEntries.Count == 0)
+                        {
+                            failures.Add($"{file.Name}: The archive does not contain any .conf files.");
+                            continue;
+                        }
+                        foreach (var archiveEntry in archiveEntries)
+                        {
+                            var archiveImportedItem = await ImportProfileTextAsync(
+                                archiveEntry.SourceName,
+                                archiveEntry.ProfileName,
+                                archiveEntry.Configuration,
+                                failures);
+                            firstImportedItem ??= archiveImportedItem;
+                        }
+                        continue;
+                    }
+                    if (properties.Size > WireGuardProfileArchiveReader.MaximumConfigurationBytes)
                     {
                         failures.Add($"{file.Name}: Configuration files must be 1 MB or smaller.");
                         continue;
                     }
-
+                    var profileName = Path.GetFileNameWithoutExtension(file.Name).Trim();
                     var text = await FileIO.ReadTextAsync(file);
-                    var profile = WireGuardConfigParser.Parse(text, profileName);
-                    var now = DateTimeOffset.UtcNow;
-                    var storedProfile = new WireRouteStoredProfile(
-                        Guid.NewGuid(),
+                    var importedItem = await ImportProfileTextAsync(
+                        file.Name,
                         profileName,
                         text,
-                        profile.DetectedRouteMode == TunnelRouteMode.Full
-                            ? StoredTunnelRouteMode.Full
-                            : StoredTunnelRouteMode.Split,
-                        profile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
-                        StoredDnsProtectionMode.Profile,
-                        null,
-                        null,
-                        Array.Empty<string>(),
-                        OnDemandEthernet: false,
-                        OnDemandWiFi: false,
-                        now,
-                        now);
-                    await profileStore.SaveAsync(storedProfile);
-                    var item = new ProfileNavigationItem(storedProfile, profile);
-                    Profiles.Add(item);
-                    await RecordActivityAsync(
-                        WireRouteActivityKind.ProfileImported,
-                        item,
-                        "Imported " + file.Name + ".");
-                    firstImportedItem ??= item;
-                }
-                catch (WireGuardConfigParseException exception)
-                {
-                    failures.Add($"{file.Name}: {exception.Message}");
+                        failures);
+                    firstImportedItem ??= importedItem;
                 }
                 catch (Exception exception)
                 {
@@ -285,6 +280,57 @@ public sealed partial class MainWindow : Window
         finally
         {
             ImportProfileButton.IsEnabled = true;
+        }
+    }
+
+    private async Task<ProfileNavigationItem?> ImportProfileTextAsync(
+        string sourceName,
+        string profileName,
+        string configuration,
+        ICollection<string> failures)
+    {
+        if (Profiles.Any(item => item.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase)))
+        {
+            failures.Add($"{sourceName}: A profile with this name is already open.");
+            return null;
+        }
+
+        try
+        {
+            var profile = WireGuardConfigParser.Parse(configuration, profileName);
+            var now = DateTimeOffset.UtcNow;
+            var storedProfile = new WireRouteStoredProfile(
+                Guid.NewGuid(),
+                profileName,
+                configuration,
+                profile.DetectedRouteMode == TunnelRouteMode.Full
+                    ? StoredTunnelRouteMode.Full
+                    : StoredTunnelRouteMode.Split,
+                profile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
+                StoredDnsProtectionMode.Profile,
+                null,
+                null,
+                Array.Empty<string>(),
+                OnDemandEthernet: false,
+                OnDemandWiFi: false,
+                now,
+                now);
+            await profileStore.SaveAsync(storedProfile);
+            var item = new ProfileNavigationItem(storedProfile, profile);
+            Profiles.Add(item);
+            await RecordActivityAsync(
+                WireRouteActivityKind.ProfileImported,
+                item,
+                "Imported " + sourceName + ".");
+            return item;
+        }
+        catch (Exception exception) when (
+            exception is WireGuardConfigParseException
+                or InvalidOperationException
+                or IOException)
+        {
+            failures.Add($"{sourceName}: {exception.Message}");
+            return null;
         }
     }
 
