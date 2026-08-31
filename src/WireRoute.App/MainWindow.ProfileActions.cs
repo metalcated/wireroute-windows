@@ -564,22 +564,47 @@ public sealed partial class MainWindow
         await ShowActivityLogAsync(item.Name + " Activity", entries);
     }
 
-    private async void ViewLogMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await ShowActivityLogAsync("WireRoute Log", await activityStore.LoadAsync());
+    private async void ViewLogMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var nativeLogs = Profiles
+            .Where(profile => profile.StoredProfile is not null)
+            .Select(profile => (
+                ProfileName: profile.Name,
+                Text: localTunnelController.ReadRuntimeLog(profile.StoredProfile!)))
+            .Where(log => !string.IsNullOrWhiteSpace(log.Text))
+            .ToArray();
+        await ShowActivityLogAsync(
+            "WireRoute Log",
+            await activityStore.LoadAsync(),
+            nativeLogs);
+    }
 
     private async Task ShowActivityLogAsync(
         string title,
-        IReadOnlyList<WireRouteActivityEntry> entries)
+        IReadOnlyList<WireRouteActivityEntry> entries,
+        IReadOnlyList<(string ProfileName, string Text)>? nativeLogs = null)
     {
-        var text = entries.Count == 0
-            ? "No WireRoute activity has been recorded yet."
-            : string.Join(
+        var sections = new List<string>();
+        if (entries.Count > 0)
+        {
+            sections.Add(string.Join(
                 Environment.NewLine,
                 entries.Select(entry =>
                     entry.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")
-                    + "    " + entry.Kind
+                    + "    [WireRoute] " + entry.Kind
                     + "    " + (entry.ProfileName ?? "WireRoute")
-                    + "    " + entry.Message));
+                    + "    " + entry.Message)));
+        }
+        if (nativeLogs is not null)
+        {
+            sections.AddRange(nativeLogs.Select(log =>
+                "WireGuardNT tunnel: " + log.ProfileName
+                + Environment.NewLine
+                + log.Text));
+        }
+        var text = sections.Count == 0
+            ? "No WireRoute or WireGuardNT activity has been recorded yet."
+            : string.Join(Environment.NewLine + Environment.NewLine, sections);
         var logBox = new TextBox
         {
             AcceptsReturn = true,
@@ -590,15 +615,37 @@ public sealed partial class MainWindow
             TextWrapping = TextWrapping.Wrap,
         };
 
+        var header = new Grid { ColumnSpacing = 18 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.Children.Add(new TextBlock
+        {
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Text = "Time",
+        });
+        var messageHeader = new TextBlock
+        {
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Text = "Log message",
+        };
+        Grid.SetColumn(messageHeader, 1);
+        header.Children.Add(messageHeader);
+
+        var logTable = new StackPanel { Spacing = 8 };
+        logTable.Children.Add(header);
+        logTable.Children.Add(logBox);
+
         var errorText = ModalErrorText();
         var content = new StackPanel { Spacing = 12 };
-        content.Children.Add(ModalCard(logBox));
+        content.Children.Add(ModalCard(logTable));
         content.Children.Add(errorText);
         ModalRequest? request = null;
         request = new ModalRequest
         {
             Title = title,
-            Subtitle = "Protected app and tunnel lifecycle events recorded by WireRoute.",
+            Subtitle = nativeLogs is { Count: > 0 }
+                ? "Protected WireRoute lifecycle history and native WireGuardNT tunnel events."
+                : "Protected app and tunnel lifecycle events recorded by WireRoute.",
             Content = content,
             PrimaryText = "Save…",
             CancelText = "Close",

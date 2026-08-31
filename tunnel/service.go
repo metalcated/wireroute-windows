@@ -8,8 +8,10 @@ package tunnel
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -36,6 +38,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 	var watcher *interfaceWatcher
 	var adapter *driver.Adapter
 	var metricsMonitor *runtimeMetricsMonitor
+	var runtimeLog *runtimeLogWriter
 	var luid winipcfg.LUID
 	var config *conf.Config
 	var err error
@@ -99,6 +102,9 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		}
 		stopIt <- true
 		log.Println("Shutting down")
+		if runtimeLog != nil {
+			_ = runtimeLog.Close()
+		}
 	}()
 
 	var logFile string
@@ -111,6 +117,15 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 	if err != nil {
 		serviceError = services.ErrorRingloggerOpen
 		return
+	}
+	if service.MetricsPath != "" {
+		runtimeLog, err = openRuntimeLog(filepath.Join(filepath.Dir(service.MetricsPath), "tunnel.log"))
+		if err != nil {
+			log.Printf("Unable to open WireRoute runtime log: %v", err)
+			err = nil
+		} else {
+			log.SetOutput(io.MultiWriter(ringlogger.Global, runtimeLog))
+		}
 	}
 
 	config, err = conf.LoadFromPath(service.Path)

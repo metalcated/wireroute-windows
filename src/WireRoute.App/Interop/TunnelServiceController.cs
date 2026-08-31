@@ -20,6 +20,7 @@ internal enum LocalTunnelState
 
 internal sealed class TunnelServiceController : IAsyncDisposable
 {
+    private const long MaximumRuntimeLogBytes = 2 * 1024 * 1024;
     private const uint ScManagerConnect = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;
     private const int ScStatusProcessInfo = 0;
@@ -106,6 +107,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         var operationDirectory = RuntimeDirectory(profile);
         var configurationPath = Path.Combine(operationDirectory, profile.Name + ".conf");
         var metricsPath = Path.Combine(operationDirectory, "tunnel.metrics");
+        var logPath = Path.Combine(operationDirectory, "tunnel.log");
         Directory.CreateDirectory(operationDirectory);
         try
         {
@@ -114,6 +116,13 @@ internal sealed class TunnelServiceController : IAsyncDisposable
                 runtimeConfiguration,
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken);
+            using (new FileStream(
+                logPath,
+                FileMode.OpenOrCreate,
+                FileAccess.Write,
+                FileShare.ReadWrite | FileShare.Delete))
+            {
+            }
             await File.WriteAllTextAsync(
                 metricsPath,
                 "{\"version\":0}",
@@ -152,6 +161,48 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         var operationDirectory = RuntimeDirectory(profile);
         TryDelete(Path.Combine(operationDirectory, "tunnel.metrics"));
         TryDeleteDirectory(operationDirectory);
+    }
+
+    public string ReadRuntimeLog(WireRouteStoredProfile profile)
+    {
+        var logPath = Path.Combine(RuntimeDirectory(profile), "tunnel.log");
+        try
+        {
+            using var stream = new FileStream(
+                logPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            var wasTrimmed = stream.Length > MaximumRuntimeLogBytes;
+            if (wasTrimmed)
+            {
+                stream.Seek(-MaximumRuntimeLogBytes, SeekOrigin.End);
+            }
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 4096,
+                leaveOpen: false);
+            var content = reader.ReadToEnd();
+            if (wasTrimmed)
+            {
+                var firstNewLine = content.IndexOf('\n');
+                if (firstNewLine >= 0)
+                {
+                    content = content[(firstNewLine + 1)..];
+                }
+            }
+            return content.TrimEnd();
+        }
+        catch (Exception exception) when (
+            exception is FileNotFoundException
+                or DirectoryNotFoundException
+                or IOException
+                or UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
     }
 
     public bool TryReadMetrics(
