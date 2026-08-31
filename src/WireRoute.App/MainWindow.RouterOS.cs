@@ -199,16 +199,15 @@ public sealed partial class MainWindow
 
         content.Children.Add(CertificateDetail("Presented now", certificate.FingerprintSha256));
 
-        var dialog = CreateDialog(
-            isReplacement ? "Router Certificate Changed" : "Verify Router Certificate",
-            content);
-        dialog.PrimaryButtonText = isReplacement ? "Replace Trust and Connect" : "Trust and Connect";
-        dialog.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
-        dialog.CloseButtonText = "Cancel";
-        dialog.CloseButtonStyle = null;
-        dialog.DefaultButton = ContentDialogButton.None;
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
+        var result = await ShowModalAsync(new ModalRequest
+        {
+            Title = isReplacement ? "Router Certificate Changed" : "Verify Router Certificate",
+            Content = ModalCard(content),
+            PrimaryText = isReplacement ? "Replace Trust and Connect" : "Trust and Connect",
+            CancelText = "Cancel",
+            MaxWidth = 760,
+        });
+        if (result != WireRouteModalResult.Primary)
         {
             SetRouterOSStatus(
                 "Connection cancelled. The router certificate was not trusted.");
@@ -800,12 +799,15 @@ public sealed partial class MainWindow
             Text = "This removes the saved connection and its password from this PC. It does not change RouterOS.",
             TextWrapping = TextWrapping.Wrap,
         };
-        var dialog = CreateDialog($"Remove ‘{connection.Name}’?", content);
-        dialog.PrimaryButtonText = "Remove Connection";
-        dialog.CloseButtonText = "Cancel";
-        dialog.CloseButtonStyle = null;
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary)
+        var result = await ShowModalAsync(new ModalRequest
+        {
+            Title = $"Remove ‘{connection.Name}’?",
+            Content = content,
+            PrimaryText = "Remove Connection",
+            CancelText = "Cancel",
+            MaxWidth = 620,
+        });
+        if (result != WireRouteModalResult.Primary)
         {
             return;
         }

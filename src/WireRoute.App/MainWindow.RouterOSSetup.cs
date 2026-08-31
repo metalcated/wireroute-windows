@@ -42,12 +42,12 @@ public sealed partial class MainWindow
             }
 
             var review = await ShowRouterOSPeerReviewAsync(proposal);
-            if (review == ContentDialogResult.Secondary)
+            if (review == WireRouteModalResult.Secondary)
             {
                 continue;
             }
 
-            if (review != ContentDialogResult.Primary)
+            if (review != WireRouteModalResult.Primary)
             {
                 return;
             }
@@ -195,7 +195,7 @@ public sealed partial class MainWindow
         UpdateInterfaceSuggestions();
         UpdateRouteMode();
 
-        var form = new StackPanel { MinWidth = 600, Spacing = 10 };
+        var form = new StackPanel { Spacing = 10 };
         form.Children.Add(new TextBlock
         {
             Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
@@ -219,45 +219,43 @@ public sealed partial class MainWindow
         form.Children.Add(routesHelp);
         form.Children.Add(keepaliveField);
         form.Children.Add(errorText);
-        var scroll = new ScrollViewer
-        {
-            Content = form,
-            MaxHeight = 650,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-        };
-        var dialog = CreateDialog("Set Up RouterOS Peer", scroll);
-        dialog.PrimaryButtonText = "Review Peer";
-        dialog.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
-        dialog.CloseButtonText = "Cancel";
-        dialog.CloseButtonStyle = null;
-        dialog.DefaultButton = ContentDialogButton.Primary;
         RouterOSPeerSetupProposal? proposal = null;
-        dialog.PrimaryButtonClick += (_, args) =>
+        ModalRequest? request = null;
+        request = new ModalRequest
         {
-            try
+            Title = "Set Up a Device",
+            Subtitle = "WireRoute generates a fresh key pair locally, suggests safe values from RouterOS, prefills your defaults, and lets you review the exact change.",
+            Content = ModalCard(form),
+            PrimaryText = "Review Peer",
+            CancelText = "Cancel",
+            MaxWidth = 960,
+            OnPrimary = () =>
             {
-                proposal = MakeRouterOSPeerProposal(
-                    state,
-                    keyPair,
-                    interfacePicker.SelectedItem as RouterOSWireGuardInterface,
-                    nameField.Text,
-                    addressField.Text,
-                    endpointField.Text,
-                    endpointPortField.Text,
-                    dnsField.Text,
-                    routeModePicker.SelectedIndex,
-                    routesField.Text,
-                    keepaliveField.Text);
-            }
-            catch (Exception exception)
-            {
-                args.Cancel = true;
-                errorText.Text = exception.Message;
-                errorText.Visibility = Visibility.Visible;
-            }
+                try
+                {
+                    proposal = MakeRouterOSPeerProposal(
+                        state,
+                        keyPair,
+                        interfacePicker.SelectedItem as RouterOSWireGuardInterface,
+                        nameField.Text,
+                        addressField.Text,
+                        endpointField.Text,
+                        endpointPortField.Text,
+                        dnsField.Text,
+                        routeModePicker.SelectedIndex,
+                        routesField.Text,
+                        keepaliveField.Text);
+                    return Task.FromResult(true);
+                }
+                catch (Exception exception)
+                {
+                    return Task.FromResult(
+                        KeepModalOpen(request!, errorText, exception.Message));
+                }
+            },
         };
-        var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary ? proposal : null;
+        var result = await ShowModalAsync(request);
+        return result == WireRouteModalResult.Primary ? proposal : null;
     }
 
     private RouterOSPeerSetupProposal MakeRouterOSPeerProposal(
@@ -331,7 +329,7 @@ public sealed partial class MainWindow
         return new RouterOSPeerSetupProposal(peerCreation, clientConfiguration);
     }
 
-    private async Task<ContentDialogResult> ShowRouterOSPeerReviewAsync(RouterOSPeerSetupProposal proposal)
+    private Task<WireRouteModalResult> ShowRouterOSPeerReviewAsync(RouterOSPeerSetupProposal proposal)
     {
         var content = new StackPanel { MinWidth = 540, Spacing = 10 };
         content.Children.Add(new TextBlock
@@ -348,14 +346,16 @@ public sealed partial class MainWindow
         content.Children.Add(ReviewDetail(
             "Client routes",
             string.Join(", ", proposal.ClientConfiguration.AllowedIps.Select(value => value.Notation))));
-        var dialog = CreateDialog("Review RouterOS Peer", content);
-        dialog.PrimaryButtonText = "Add Peer";
-        dialog.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
-        dialog.SecondaryButtonText = "Back";
-        dialog.CloseButtonText = "Cancel";
-        dialog.CloseButtonStyle = null;
-        dialog.DefaultButton = ContentDialogButton.None;
-        return await dialog.ShowAsync();
+        return ShowModalAsync(new ModalRequest
+        {
+            Title = "Review RouterOS Peer",
+            Subtitle = "Confirm the exact RouterOS change and matching local WireGuard profile.",
+            Content = ModalCard(content),
+            PrimaryText = "Add Peer",
+            SecondaryText = "Back",
+            CancelText = "Cancel",
+            MaxWidth = 760,
+        });
     }
 
     private async Task CreateRouterOSPeerAndImportAsync(RouterOSPeerSetupProposal proposal)
@@ -493,17 +493,20 @@ public sealed partial class MainWindow
             Text = "The configuration contains a private key. Save or copy it only to a trusted location.",
             TextWrapping = TextWrapping.Wrap,
         });
-        var dialog = CreateDialog(title, content);
-        dialog.PrimaryButtonText = "Save Configuration…";
-        dialog.SecondaryButtonText = "Copy Configuration";
-        dialog.CloseButtonText = "Done";
-        dialog.CloseButtonStyle = null;
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
+        var result = await ShowModalAsync(new ModalRequest
+        {
+            Title = title,
+            Content = ModalCard(content),
+            PrimaryText = "Save Configuration…",
+            SecondaryText = "Copy Configuration",
+            CancelText = "Done",
+            MaxWidth = 720,
+        });
+        if (result == WireRouteModalResult.Primary)
         {
             await SaveRecoveryConfigurationAsync(recovery);
         }
-        else if (result == ContentDialogResult.Secondary)
+        else if (result == WireRouteModalResult.Secondary)
         {
             try
             {

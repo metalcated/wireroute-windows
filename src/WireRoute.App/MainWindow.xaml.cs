@@ -449,19 +449,6 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private ContentDialog CreateDialog(string title, object content) => new()
-    {
-        XamlRoot = Root.XamlRoot,
-        Title = title,
-        Content = content,
-        Background = (Brush)Application.Current.Resources["NordicCanvasBrush"],
-        BorderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"],
-        BorderThickness = new Thickness(1),
-        CloseButtonText = "Done",
-        CloseButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
-        DefaultButton = ContentDialogButton.None,
-    };
-
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         await ShowAboutAsync();
