@@ -264,7 +264,7 @@
                             <TextBlock
                                 Foreground="{StaticResource NordicSecondaryTextBrush}"
                                 FontSize="12"
-                                Text="Import a .conf file to review it locally. Saving and tunnel activation remain isolated until the manager protocol is connected."
+                                Text="Import a .conf or .zip file to protect it locally and activate it with WireGuardNT."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

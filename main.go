@@ -67,7 +67,7 @@ func info(title, format string, v ...any) {
 
 func usage() {
 	flags := [...]string{
-		l18n.Sprintf("(no argument): elevate and install manager service"),
+		l18n.Sprintf("(no argument): launch WireRoute when installed beside this backend"),
 		"/installmanagerservice",
 		"/installtunnelservice CONFIG_PATH",
 		"/installephemeraltunnelservice CONFIG_PATH",
