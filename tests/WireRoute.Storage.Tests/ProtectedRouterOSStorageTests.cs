@@ -86,6 +86,52 @@ public sealed class ProtectedRouterOSStorageTests
     }
 
     [TestMethod]
+    public async Task ActivityStoreProtectsAndFiltersProfileHistory()
+    {
+        var directory = NewStorageDirectory();
+        try
+        {
+            var store = new WireRouteActivityStore(directory);
+            var profileId = Guid.NewGuid();
+            var otherProfileId = Guid.NewGuid();
+            var first = new WireRouteActivityEntry(
+                Guid.NewGuid(),
+                DateTimeOffset.UtcNow.AddSeconds(-1),
+                WireRouteActivityKind.ProfileActivated,
+                profileId,
+                "Laptop",
+                "Activated Laptop.");
+            var second = new WireRouteActivityEntry(
+                Guid.NewGuid(),
+                DateTimeOffset.UtcNow,
+                WireRouteActivityKind.TunnelError,
+                otherProfileId,
+                "Phone",
+                "Tunnel failure details that remain protected.");
+
+            await store.AppendAsync(first);
+            await store.AppendAsync(second);
+
+            var all = await store.LoadAsync();
+            Assert.AreEqual(2, all.Count);
+            Assert.AreEqual(second.Id, all[0].Id);
+            var profileHistory = await store.LoadAsync(profileId);
+            Assert.AreEqual(1, profileHistory.Count);
+            Assert.AreEqual(first.Id, profileHistory[0].Id);
+            var protectedText = Encoding.UTF8.GetString(
+                await File.ReadAllBytesAsync(Path.Combine(directory, "activity.dpapi")));
+            Assert.IsFalse(protectedText.Contains("Tunnel failure details", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
     public void DpapiRoundTripUsesNonInteractiveCurrentUserProtection()
     {
         var plaintext = Encoding.UTF8.GetBytes("router-password-that-must-not-be-plaintext");

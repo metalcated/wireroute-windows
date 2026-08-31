@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private readonly ManagerProtocolClient? managerClient;
     private readonly string? managerLaunchError;
     private readonly WireGuardProfileStore profileStore = new();
+    private readonly WireRouteActivityStore activityStore = new();
     private readonly TunnelServiceController localTunnelController = new();
     private ProfileNavigationItem? selectedProfile;
     private bool isExiting;
@@ -52,6 +53,10 @@ public sealed partial class MainWindow : Window
         _ = LoadSettingsAsync();
         _ = LoadRouterOSConnectionsAsync();
         _ = InitializeManagerAsync();
+        _ = RecordActivityAsync(
+            WireRouteActivityKind.AppStarted,
+            null,
+            "WireRoute started in service-free mode.");
         Closed += MainWindow_Closed;
     }
 
@@ -215,6 +220,10 @@ public sealed partial class MainWindow : Window
                     await profileStore.SaveAsync(storedProfile);
                     var item = new ProfileNavigationItem(storedProfile, profile);
                     Profiles.Add(item);
+                    await RecordActivityAsync(
+                        WireRouteActivityKind.ProfileImported,
+                        item,
+                        "Imported " + file.Name + ".");
                     firstImportedItem ??= item;
                 }
                 catch (WireGuardConfigParseException exception)
@@ -262,6 +271,7 @@ public sealed partial class MainWindow : Window
         if (item.Profile is not null)
         {
             ShowProfile(item, item.Profile);
+            await UpdateActivitySummaryAsync(item);
             return;
         }
 
@@ -273,6 +283,7 @@ public sealed partial class MainWindow : Window
                     ManagerMethods.GetProfile,
                     new ManagerGetProfileRequest(item.ManagerName));
                 ShowManagerProfile(item, detail);
+                await UpdateActivitySummaryAsync(item);
             }
             catch (Exception exception)
             {

@@ -165,11 +165,19 @@ public sealed partial class MainWindow
                     {
                         var created = new ProfileNavigationItem(stored, parsed);
                         Profiles.Add(created);
+                        await RecordActivityAsync(
+                            WireRouteActivityKind.ProfileCreated,
+                            created,
+                            "Created a protected WireGuard profile.");
                         ProfilesList.SelectedItem = created;
                     }
                     else
                     {
                         item.UpdateStoredProfile(stored, parsed);
+                        await RecordActivityAsync(
+                            WireRouteActivityKind.ProfileUpdated,
+                            item,
+                            "Updated the WireGuard configuration.");
                         RefreshProfileListItem(item);
                         await ShowProfileAsync(item);
                     }
@@ -329,6 +337,12 @@ public sealed partial class MainWindow
         };
         await profileStore.SaveAsync(stored, managerCancellation.Token);
         item.UpdateStoredProfile(stored, parsed);
+        await RecordActivityAsync(
+            WireRouteActivityKind.ProfileUpdated,
+            item,
+            mode == StoredTunnelRouteMode.Full
+                ? "Changed traffic routing to Full."
+                : "Changed traffic routing to Split.");
         RefreshProfileListItem(item);
         await ShowProfileAsync(item);
     }
@@ -496,6 +510,12 @@ public sealed partial class MainWindow
                     var parsed = WireGuardConfigParser.Parse(configuration, item.Name);
                     await profileStore.SaveAsync(updated, managerCancellation.Token);
                     item.UpdateStoredProfile(updated, parsed);
+                    await RecordActivityAsync(
+                        WireRouteActivityKind.ProfileUpdated,
+                        item,
+                        encrypted
+                            ? "Changed DNS protection to " + provider + "."
+                            : "Changed DNS protection to Profile DNS.");
                     RefreshProfileListItem(item);
                     await ShowProfileAsync(item);
                     return true;
@@ -512,35 +532,147 @@ public sealed partial class MainWindow
         await ShowModalAsync(request);
     }
 
-    private async void ProfileHistoryButton_Click(object sender, RoutedEventArgs e) =>
-        await ShowLogAsync(
-            "Activity history",
-            "No previous connection activity has been recorded for this profile.");
+    private async void ProfileHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = selectedProfile;
+        if (item is null)
+        {
+            await ShowMessageAsync("No profile selected", "Select a profile to view its activity history.");
+            return;
+        }
+
+        var entries = await LoadProfileActivityAsync(item);
+        await ShowActivityLogAsync(item.Name + " Activity", entries);
+    }
 
     private async void ViewLogMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await ShowLogAsync(
-            "WireRoute Log",
-            "WireRoute started in service-free mode. No tunnel log entries are available yet.");
+        await ShowActivityLogAsync("WireRoute Log", await activityStore.LoadAsync());
 
-    private async Task ShowLogAsync(string title, string message)
+    private async Task ShowActivityLogAsync(
+        string title,
+        IReadOnlyList<WireRouteActivityEntry> entries)
     {
+        var text = entries.Count == 0
+            ? "No WireRoute activity has been recorded yet."
+            : string.Join(
+                Environment.NewLine,
+                entries.Select(entry =>
+                    entry.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    + "    " + entry.Kind
+                    + "    " + (entry.ProfileName ?? "WireRoute")
+                    + "    " + entry.Message));
         var logBox = new TextBox
         {
             AcceptsReturn = true,
             FontFamily = new FontFamily("Cascadia Mono"),
             IsReadOnly = true,
             MinHeight = 360,
-            Text = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                + "    " + message,
+            Text = text,
             TextWrapping = TextWrapping.Wrap,
         };
-        await ShowModalAsync(new ModalRequest
+
+        var errorText = ModalErrorText();
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(ModalCard(logBox));
+        content.Children.Add(errorText);
+        ModalRequest? request = null;
+        request = new ModalRequest
         {
             Title = title,
-            Content = ModalCard(logBox),
+            Subtitle = "Protected app and tunnel lifecycle events recorded by WireRoute.",
+            Content = content,
+            PrimaryText = "Save…",
             CancelText = "Close",
             MaxWidth = 960,
-        });
+            OnPrimary = async () =>
+            {
+                try
+                {
+                    var picker = new FileSavePicker
+                    {
+                        SuggestedFileName = "WireRoute-activity-"
+                            + DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss"),
+                        SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                    };
+                    picker.FileTypeChoices.Add("Log file", new[] { ".log" });
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+                    var file = await picker.PickSaveFileAsync();
+                    if (file is null)
+                    {
+                        return false;
+                    }
+                    await Windows.Storage.FileIO.WriteTextAsync(file, text);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    return KeepModalOpen(request!, errorText, exception.Message);
+                }
+            },
+        };
+        await ShowModalAsync(request);
+    }
+
+    private async Task<IReadOnlyList<WireRouteActivityEntry>> LoadProfileActivityAsync(
+        ProfileNavigationItem item)
+    {
+        if (item.StoredProfile is not null)
+        {
+            return await activityStore.LoadAsync(
+                item.StoredProfile.Id,
+                managerCancellation.Token);
+        }
+
+        return (await activityStore.LoadAsync(cancellationToken: managerCancellation.Token))
+            .Where(entry => entry.ProfileName?.Equals(
+                item.Name,
+                StringComparison.OrdinalIgnoreCase) == true)
+            .ToArray();
+    }
+
+    private async Task UpdateActivitySummaryAsync(ProfileNavigationItem item)
+    {
+        ProfileDownloadText.Text = "Zero KB/s";
+        ProfileUploadText.Text = "Zero KB/s";
+        ProfileSessionTotalText.Text = "—";
+        ProfileHandshakeText.Text = "—";
+        try
+        {
+            var mostRecent = (await LoadProfileActivityAsync(item)).FirstOrDefault();
+            ProfileActivityText.Text = item.IsActive
+                ? "Tunnel active. WireRoute is recording connection activity."
+                : mostRecent is null
+                    ? "Connect this profile to begin recording activity."
+                    : "Last activity "
+                        + mostRecent.Timestamp.ToLocalTime().ToString("g")
+                        + ": " + mostRecent.Message;
+        }
+        catch (WireRouteStorageException)
+        {
+            ProfileActivityText.Text = "Activity history is temporarily unavailable.";
+        }
+    }
+
+    private async Task RecordActivityAsync(
+        WireRouteActivityKind kind,
+        ProfileNavigationItem? item,
+        string message)
+    {
+        try
+        {
+            await activityStore.AppendAsync(
+                new WireRouteActivityEntry(
+                    Guid.NewGuid(),
+                    DateTimeOffset.UtcNow,
+                    kind,
+                    item?.StoredProfile?.Id,
+                    item?.Name,
+                    message));
+        }
+        catch (WireRouteStorageException)
+        {
+            // Tunnel actions must not fail merely because optional history could not be written.
+        }
     }
 
     private async void ExportAllProfilesMenuItem_Click(object sender, RoutedEventArgs e)
@@ -627,6 +759,10 @@ public sealed partial class MainWindow
                 await profileStore.DeleteAsync(
                     item.StoredProfile.Id,
                     managerCancellation.Token);
+                await RecordActivityAsync(
+                    WireRouteActivityKind.ProfileDeleted,
+                    item,
+                    "Deleted the protected local profile.");
                 Profiles.Remove(item);
                 selectedProfile = null;
                 ShowDestination(Destination.Profile);

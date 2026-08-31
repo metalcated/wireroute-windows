@@ -218,6 +218,19 @@ public sealed partial class MainWindow
         }
 
         var wasActive = localTunnelController.GetState(item.Name) == LocalTunnelState.Active;
+        if (!wasActive && item.Profile?.Interface.HasHooks == true)
+        {
+            const string message =
+                "This profile contains PreUp, PostUp, PreDown, or PostDown commands. "
+                + "WireRoute does not execute imported scripts in service-free mode. "
+                + "Remove the hook commands in Edit before activating the tunnel.";
+            await RecordActivityAsync(WireRouteActivityKind.TunnelError, item, message);
+            RestoreWindowFromTray();
+            await ShowMessageAsync("Tunnel hooks are blocked", message);
+            SetProfileManagerControls(item);
+            return;
+        }
+
         item.UpdateState(wasActive ? LocalTunnelState.Deactivating : LocalTunnelState.Activating);
         RefreshProfileListItem(item);
         try
@@ -231,16 +244,32 @@ public sealed partial class MainWindow
                 await localTunnelController.StartAsync(item.StoredProfile, managerCancellation.Token);
             }
             item.UpdateState(localTunnelController.GetState(item.Name));
+            await RecordActivityAsync(
+                wasActive
+                    ? WireRouteActivityKind.ProfileDeactivated
+                    : WireRouteActivityKind.ProfileActivated,
+                item,
+                wasActive
+                    ? "Disconnected the tunnel."
+                    : "Activated the tunnel with WireGuardNT.");
         }
         catch (OperationCanceledException exception)
         {
             item.UpdateState(localTunnelController.GetState(item.Name));
+            await RecordActivityAsync(
+                WireRouteActivityKind.TunnelError,
+                item,
+                "Windows elevation was canceled: " + exception.Message);
             RestoreWindowFromTray();
             await ShowMessageAsync("Tunnel approval was canceled", exception.Message);
         }
         catch (Exception exception)
         {
             item.UpdateState(localTunnelController.GetState(item.Name));
+            await RecordActivityAsync(
+                WireRouteActivityKind.TunnelError,
+                item,
+                "Tunnel state change failed: " + exception.Message);
             RestoreWindowFromTray();
             await ShowMessageAsync("Tunnel state could not be changed", exception.Message);
         }
@@ -250,6 +279,7 @@ public sealed partial class MainWindow
             if (ReferenceEquals(selectedProfile, item))
             {
                 SetProfileManagerControls(item);
+                await UpdateActivitySummaryAsync(item);
             }
         }
     }
@@ -279,7 +309,8 @@ public sealed partial class MainWindow
 
         try
         {
-            var method = item.ManagerState == ManagerTunnelState.Started
+            var wasActive = item.ManagerState == ManagerTunnelState.Started;
+            var method = wasActive
                 ? ManagerMethods.StopTunnel
                 : ManagerMethods.StartTunnel;
             var response = await managerClient.RequestAsync<ManagerTunnelCommandRequest, ManagerTunnelCommandResponse>(
@@ -287,9 +318,19 @@ public sealed partial class MainWindow
                 new ManagerTunnelCommandRequest(item.ManagerName),
                 managerCancellation.Token);
             UpdateManagerProfileState(response.Name, response.State);
+            await RecordActivityAsync(
+                wasActive
+                    ? WireRouteActivityKind.ProfileDeactivated
+                    : WireRouteActivityKind.ProfileActivated,
+                item,
+                wasActive ? "Disconnected the tunnel." : "Activated the tunnel.");
         }
         catch (Exception exception)
         {
+            await RecordActivityAsync(
+                WireRouteActivityKind.TunnelError,
+                item,
+                "Tunnel state change failed: " + exception.Message);
             RestoreWindowFromTray();
             await ShowMessageAsync("Tunnel state could not be changed", exception.Message);
             if (ReferenceEquals(selectedProfile, item))
@@ -326,6 +367,10 @@ public sealed partial class MainWindow
             await profileStore.SaveAsync(storedProfile, managerCancellation.Token);
             var localItem = new ProfileNavigationItem(storedProfile, localProfile);
             Profiles.Add(localItem);
+            await RecordActivityAsync(
+                WireRouteActivityKind.RouterOSProfileCreated,
+                localItem,
+                "Generated and protected a client profile from RouterOS.");
             ProfilesList.SelectedItem = localItem;
             return localItem;
         }
@@ -348,6 +393,10 @@ public sealed partial class MainWindow
         }
 
         Profiles.Add(item);
+        await RecordActivityAsync(
+            WireRouteActivityKind.RouterOSProfileCreated,
+            item,
+            "Generated and imported a client profile from RouterOS.");
         ProfilesList.SelectedItem = item;
         return item;
     }
