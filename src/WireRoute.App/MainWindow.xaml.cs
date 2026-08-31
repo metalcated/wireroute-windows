@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
         this.managerClient = managerClient;
         this.managerLaunchError = managerLaunchError;
         InitializeComponent();
+        Root.ActualThemeChanged += Root_ActualThemeChanged;
         Profiles.CollectionChanged += (_, _) => UpdateProfilesEmptyState();
 
         windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
