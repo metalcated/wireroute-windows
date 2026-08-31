@@ -65,6 +65,42 @@ public sealed class ProtectedRouterOSStorageTests
     }
 
     [TestMethod]
+    public async Task ConnectionStoreRejectsInsecureRouterUrls()
+    {
+        var store = new RouterOSConnectionStore(NewStorageDirectory());
+        var connection = Connection("Lab") with { Url = "http://router.example" };
+
+        await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+            await store.SaveAsync(connection));
+    }
+
+    [TestMethod]
+    public async Task ProfileRecoveryStoreProtectsAndUpdatesGeneratedConfiguration()
+    {
+        var directory = NewStorageDirectory();
+        var store = new RouterOSProfileRecoveryStore(directory);
+        var recovery = new RouterOSProfileRecovery(
+            Guid.NewGuid(),
+            "Laptop",
+            "[Interface]\nPrivateKey = private-material",
+            DateTimeOffset.UtcNow,
+            RouterOSProfileRecoveryReason.PendingRouterWrite);
+
+        await store.SaveAsync(recovery);
+        Assert.AreEqual(recovery, (await store.LoadAllAsync()).Single());
+        var protectedBytes = await File.ReadAllBytesAsync(
+            Path.Combine(directory, "routeros-profile-recovery.dpapi"));
+        Assert.IsFalse(Encoding.UTF8.GetString(protectedBytes).Contains("private-material", StringComparison.Ordinal));
+
+        var updated = recovery with { Reason = RouterOSProfileRecoveryReason.RouterWriteUncertain };
+        await store.SaveAsync(updated);
+        Assert.AreEqual(updated, (await store.LoadAllAsync()).Single());
+
+        await store.DeleteAsync(recovery.Id);
+        Assert.AreEqual(0, (await store.LoadAllAsync()).Count);
+    }
+
+    [TestMethod]
     public async Task CertificateStorePinsExactDerToHostAndPort()
     {
         var store = new RouterOSCertificateStore(NewStorageDirectory());

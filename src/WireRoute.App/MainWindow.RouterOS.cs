@@ -256,6 +256,7 @@ public sealed partial class MainWindow
         RouterOSConnectionPicker.IsEnabled = !isBusy && RouterOSConnections.Count > 0;
         RouterOSConnectButton.IsEnabled = !isBusy && RouterOSConnectionPicker.SelectedItem is not null;
         RouterOSShowAllPeersCheckBox.IsEnabled = !isBusy && routerOSPeers.Count > 0;
+        UpdateRouterOSManagerAvailability();
     }
 
     private void SetRouterOSStatus(string status, bool isError = false, bool isSuccess = false)

@@ -228,6 +228,8 @@ public sealed partial class MainWindow
     private void UpdateRouterOSManagerAvailability()
     {
         RouterOSSetUpPeerButton.IsEnabled = routerOSConnectedContext is not null
+            && routerOSInterfaces.Count > 0
+            && !isRouterOSBusy
             && managerCapabilities?.CanImportProfiles == true;
     }
 

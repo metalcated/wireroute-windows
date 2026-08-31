@@ -460,6 +460,7 @@
                         <Button
                             x:Name="RouterOSSetUpPeerButton"
                             Grid.Column="2"
+                            Click="RouterOSSetUpPeerButton_Click"
                             IsEnabled="False"
                             Content="Set Up Peer…" />
                     </Grid>

@@ -85,11 +85,11 @@ public sealed class RouterOSConnectionStore
         }
 
         if (!Uri.TryCreate(connection.Url, UriKind.Absolute, out var url)
-            || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps)
+            || url.Scheme != Uri.UriSchemeHttps
             || string.IsNullOrWhiteSpace(url.Host))
         {
             throw new ArgumentException(
-                "Enter a complete RouterOS address beginning with http:// or https://.",
+                "Enter a complete secure RouterOS address beginning with https://.",
                 nameof(connection));
         }
 
