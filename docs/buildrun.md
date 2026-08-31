@@ -12,10 +12,10 @@ C:\Projects\wireguard-windows> build
 
 ### Running
 
-After you've built the application, run `amd64\wireguard.exe` or `x86\wireguard.exe` to install the manager service and show the UI.
+After publishing the WireRoute client, run `amd64\WireRoute.exe`. Closing the window keeps WireRoute in the notification area. Starting and stopping a tunnel requests elevation only for that operation; no persistent manager service is installed.
 
 ```text
-C:\Projects\wireguard-windows> amd64\wireguard.exe
+C:\Projects\wireroute-windows> amd64\WireRoute.exe
 ```
 
 ## Building the WireRoute WinUI client

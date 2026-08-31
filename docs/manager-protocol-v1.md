@@ -107,7 +107,7 @@ The following steps require explicit approval because they change manager launch
 
 1. Add a separate Go v1 framed-JSON server without changing existing `gob` behavior.
 2. Add read-only handlers backed by `conf.ListConfigNames`, redacted `conf.LoadFromName`, and current tunnel state.
-3. Teach the manager installer/runtime to locate and launch `WireRoute.App.exe` with inherited v1 pipe handles.
+3. Teach the compatibility manager runtime to locate and launch `WireRoute.exe` with inherited v1 pipe handles.
 4. Validate profile listing and state events on x64 while connect/import remain disabled.
 5. Repeat the read-only validation in the native ARM64 VM.
 6. Specify and threat-review import/start/stop requests before enabling mutations.
