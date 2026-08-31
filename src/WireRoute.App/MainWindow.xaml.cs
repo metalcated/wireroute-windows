@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly ManagerProtocolClient? managerClient;
     private readonly string? managerLaunchError;
     private readonly WireGuardProfileStore profileStore = new();
+    private readonly TunnelServiceController localTunnelController = new();
     private ProfileNavigationItem? selectedProfile;
     private bool isExiting;
 
@@ -413,25 +414,37 @@ public sealed partial class MainWindow : Window
 
     private TrayMenuSnapshot CreateTrayMenuSnapshot()
     {
-        var managedProfiles = Profiles.Where(profile => profile.IsManaged).ToArray();
-        var status = managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Starting)
+        var availableProfiles = Profiles.Where(profile => profile.IsManaged || profile.IsStoredLocally).ToArray();
+        foreach (var profile in availableProfiles.Where(profile => profile.IsStoredLocally && !profile.IsManaged))
+        {
+            profile.UpdateState(localTunnelController.GetState(profile.Name));
+        }
+
+        var status = availableProfiles.Any(profile =>
+                profile.ManagerState == ManagerTunnelState.Starting
+                || profile.LocalTunnelState == LocalTunnelState.Activating)
             ? "Status: Activating"
-            : managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Stopping)
+            : availableProfiles.Any(profile =>
+                profile.ManagerState == ManagerTunnelState.Stopping
+                || profile.LocalTunnelState == LocalTunnelState.Deactivating)
                 ? "Status: Deactivating"
-                : managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Started)
+                : availableProfiles.Any(profile => profile.IsActive)
                     ? "Status: Active"
                     : "Status: Inactive";
-        var tunnels = managedProfiles
+        var tunnels = availableProfiles
             .Select(profile => new TrayTunnelMenuItem(
-                profile.ManagerName!,
+                profile.ManagerName ?? profile.StoredProfile!.Id.ToString("D"),
                 profile.Name,
-                profile.ManagerState is ManagerTunnelState.Starting or ManagerTunnelState.Started,
-                profile.ManagerState switch
-                {
-                    ManagerTunnelState.Started => managerCapabilities?.CanStopTunnels == true,
-                    ManagerTunnelState.Stopped => managerCapabilities?.CanStartTunnels == true,
-                    _ => false,
-                }))
+                profile.IsActive || profile.IsTransitioning,
+                !profile.IsTransitioning
+                    && (profile.IsManaged
+                        ? profile.ManagerState switch
+                        {
+                            ManagerTunnelState.Started => managerCapabilities?.CanStopTunnels == true,
+                            ManagerTunnelState.Stopped => managerCapabilities?.CanStartTunnels == true,
+                            _ => false,
+                        }
+                        : localTunnelController.IsAvailable)))
             .ToArray();
         return new TrayMenuSnapshot(status, tunnels);
     }
@@ -442,10 +455,13 @@ public sealed partial class MainWindow : Window
         {
             case TrayMenuActionKind.ToggleTunnel:
                 var profile = Profiles.FirstOrDefault(item =>
-                    item.ManagerName?.Equals(action.ManagerName, StringComparison.OrdinalIgnoreCase) == true);
+                    item.ManagerName?.Equals(action.ManagerName, StringComparison.OrdinalIgnoreCase) == true
+                    || item.StoredProfile?.Id.ToString("D").Equals(
+                        action.ManagerName,
+                        StringComparison.OrdinalIgnoreCase) == true);
                 if (profile is not null)
                 {
-                    await ToggleManagerProfileAsync(profile);
+                    await ToggleProfileAsync(profile);
                 }
 
                 break;
@@ -477,7 +493,7 @@ public sealed partial class MainWindow : Window
 
     private async Task QuitWireRouteAsync()
     {
-        if (Profiles.Any(profile => profile.ManagerState == ManagerTunnelState.Started))
+        if (Profiles.Any(profile => profile.IsActive))
         {
             RestoreWindowFromTray();
             var confirmation = CreateDialog(

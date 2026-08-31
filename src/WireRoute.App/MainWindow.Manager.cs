@@ -1,9 +1,11 @@
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WireRoute.App.Interop;
 using WireRoute.App.Models;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
+using WireRoute.Core.Routing;
 using WireRoute.Storage;
 
 namespace WireRoute.App;
@@ -150,6 +152,23 @@ public sealed partial class MainWindow
             : item.IsStoredLocally
                 ? "Saved securely on this PC with Windows DPAPI"
                 : "Imported locally for review • Not saved";
+        if (item.IsStoredLocally && !item.IsManaged)
+        {
+            item.UpdateState(localTunnelController.GetState(item.Name));
+            ProfileConnectButton.IsEnabled = localTunnelController.IsAvailable
+                && item.LocalTunnelState is LocalTunnelState.Inactive or LocalTunnelState.Active;
+            ProfileConnectButton.Content = item.LocalTunnelState switch
+            {
+                LocalTunnelState.Active => "Deactivate",
+                LocalTunnelState.Activating or LocalTunnelState.Deactivating => "Please wait…",
+                _ => "Activate",
+            };
+            ToolTipService.SetToolTip(
+                ProfileConnectButton,
+                "Activate with WireGuardNT. Windows asks for approval only when starting or stopping this tunnel.");
+            return;
+        }
+
         var canChangeState = item.ManagerState == ManagerTunnelState.Started
             ? managerCapabilities?.CanStopTunnels == true
             : managerCapabilities?.CanStartTunnels == true;
@@ -158,10 +177,10 @@ public sealed partial class MainWindow
             && canChangeState
             && item.ManagerState is ManagerTunnelState.Stopped or ManagerTunnelState.Started;
         ProfileConnectButton.Content = item.ManagerState == ManagerTunnelState.Started
-            ? "Disconnect"
+            ? "Deactivate"
             : item.ManagerState is ManagerTunnelState.Starting or ManagerTunnelState.Stopping
                 ? "Please wait…"
-                : "Connect";
+                : "Activate";
         ToolTipService.SetToolTip(
             ProfileConnectButton,
             item.IsManaged
@@ -178,7 +197,72 @@ public sealed partial class MainWindow
         }
 
         ProfileConnectButton.IsEnabled = false;
-        await ToggleManagerProfileAsync(item);
+        await ToggleProfileAsync(item);
+    }
+
+    private Task ToggleProfileAsync(ProfileNavigationItem item) =>
+        item.IsStoredLocally && !item.IsManaged
+            ? ToggleLocalProfileAsync(item)
+            : ToggleManagerProfileAsync(item);
+
+    private async Task ToggleLocalProfileAsync(ProfileNavigationItem item)
+    {
+        if (item.StoredProfile is null)
+        {
+            return;
+        }
+
+        var wasActive = localTunnelController.GetState(item.Name) == LocalTunnelState.Active;
+        item.UpdateState(wasActive ? LocalTunnelState.Deactivating : LocalTunnelState.Activating);
+        RefreshProfileListItem(item);
+        try
+        {
+            if (wasActive)
+            {
+                await localTunnelController.StopAsync(item.Name, managerCancellation.Token);
+            }
+            else
+            {
+                await localTunnelController.StartAsync(item.StoredProfile, managerCancellation.Token);
+            }
+            item.UpdateState(localTunnelController.GetState(item.Name));
+        }
+        catch (OperationCanceledException exception)
+        {
+            item.UpdateState(localTunnelController.GetState(item.Name));
+            RestoreWindowFromTray();
+            await ShowMessageAsync("Tunnel approval was canceled", exception.Message);
+        }
+        catch (Exception exception)
+        {
+            item.UpdateState(localTunnelController.GetState(item.Name));
+            RestoreWindowFromTray();
+            await ShowMessageAsync("Tunnel state could not be changed", exception.Message);
+        }
+        finally
+        {
+            RefreshProfileListItem(item);
+            if (ReferenceEquals(selectedProfile, item))
+            {
+                SetProfileManagerControls(item);
+            }
+        }
+    }
+
+    private void RefreshProfileListItem(ProfileNavigationItem item)
+    {
+        var index = Profiles.IndexOf(item);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Profiles.RemoveAt(index);
+        Profiles.Insert(index, item);
+        if (ReferenceEquals(selectedProfile, item))
+        {
+            ProfilesList.SelectedItem = item;
+        }
     }
 
     private async Task ToggleManagerProfileAsync(ProfileNavigationItem item)
@@ -216,16 +300,16 @@ public sealed partial class MainWindow
     {
         if (managerClient is null || managerCapabilities?.CanImportProfiles != true)
         {
-            var profile = WireGuardConfigParser.Parse(wgQuickConfiguration, displayName);
+            var localProfile = WireGuardConfigParser.Parse(wgQuickConfiguration, displayName);
             var now = DateTimeOffset.UtcNow;
             var storedProfile = new WireRouteStoredProfile(
                 Guid.NewGuid(),
                 displayName,
                 wgQuickConfiguration,
-                profile.DetectedRouteMode == TunnelRouteMode.Full
+                localProfile.DetectedRouteMode == TunnelRouteMode.Full
                     ? StoredTunnelRouteMode.Full
                     : StoredTunnelRouteMode.Split,
-                profile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
+                localProfile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
                 StoredDnsProtectionMode.Profile,
                 null,
                 null,
@@ -235,7 +319,7 @@ public sealed partial class MainWindow
                 now,
                 now);
             await profileStore.SaveAsync(storedProfile, managerCancellation.Token);
-            var localItem = new ProfileNavigationItem(storedProfile, profile);
+            var localItem = new ProfileNavigationItem(storedProfile, localProfile);
             Profiles.Add(localItem);
             ProfilesList.SelectedItem = localItem;
             return localItem;

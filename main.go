@@ -69,8 +69,10 @@ func usage() {
 		l18n.Sprintf("(no argument): elevate and install manager service"),
 		"/installmanagerservice",
 		"/installtunnelservice CONFIG_PATH",
+		"/installephemeraltunnelservice CONFIG_PATH",
 		"/uninstallmanagerservice",
 		"/uninstalltunnelservice TUNNEL_NAME",
+		"/stopephemeraltunnelservice TUNNEL_NAME",
 		"/managerservice",
 		"/tunnelservice CONFIG_PATH",
 		"/ui CMD_READ_HANDLE CMD_WRITE_HANDLE CMD_EVENT_HANDLE LOG_MAPPING_HANDLE",
@@ -239,6 +241,15 @@ func main() {
 			fatal(err)
 		}
 		return
+	case "/installephemeraltunnelservice":
+		if len(os.Args) != 3 {
+			usage()
+		}
+		if err := manager.InstallEphemeralTunnel(os.Args[2]); err != nil {
+			log.Printf("Unable to start ephemeral tunnel: %v", err)
+			os.Exit(1)
+		}
+		return
 	case "/uninstalltunnelservice":
 		if len(os.Args) != 3 {
 			usage()
@@ -246,6 +257,15 @@ func main() {
 		err := manager.UninstallTunnel(os.Args[2])
 		if err != nil {
 			fatal(err)
+		}
+		return
+	case "/stopephemeraltunnelservice":
+		if len(os.Args) != 3 {
+			usage()
+		}
+		if err := manager.UninstallTunnel(os.Args[2]); err != nil {
+			log.Printf("Unable to stop ephemeral tunnel: %v", err)
+			os.Exit(1)
 		}
 		return
 	case "/tunnelservice":

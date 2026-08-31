@@ -2,6 +2,7 @@ using WireRoute.Core.Profiles;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Routing;
 using WireRoute.Storage;
+using WireRoute.App.Interop;
 
 namespace WireRoute.App.Models;
 
@@ -56,6 +57,16 @@ public sealed class ProfileNavigationItem
 
     internal bool IsStoredLocally => StoredProfile is not null;
 
+    internal LocalTunnelState LocalTunnelState { get; private set; } = LocalTunnelState.Inactive;
+
+    internal bool IsActive => IsManaged
+        ? ManagerState == ManagerTunnelState.Started
+        : LocalTunnelState == LocalTunnelState.Active;
+
+    internal bool IsTransitioning => IsManaged
+        ? ManagerState is ManagerTunnelState.Starting or ManagerTunnelState.Stopping
+        : LocalTunnelState is LocalTunnelState.Activating or LocalTunnelState.Deactivating;
+
     internal void UpdateStoredProfile(WireRouteStoredProfile storedProfile, WireGuardProfile profile)
     {
         StoredProfile = storedProfile;
@@ -68,6 +79,19 @@ public sealed class ProfileNavigationItem
     {
         ManagerState = state;
         Status = StatusText(state);
+    }
+
+    internal void UpdateState(LocalTunnelState state)
+    {
+        LocalTunnelState = state;
+        Status = state switch
+        {
+            LocalTunnelState.Activating => "Activating",
+            LocalTunnelState.Active => "Active",
+            LocalTunnelState.Deactivating => "Deactivating",
+            LocalTunnelState.Inactive => "Inactive",
+            _ => "Status unavailable",
+        };
     }
 
     private static string StatusText(ManagerTunnelState state) => state switch

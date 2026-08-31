@@ -118,6 +118,14 @@ func UninstallManager() error {
 }
 
 func InstallTunnel(configPath string) error {
+	return installTunnel(configPath, false)
+}
+
+func InstallEphemeralTunnel(configPath string) error {
+	return installTunnel(configPath, true)
+}
+
+func installTunnel(configPath string, ephemeral bool) error {
 	m, err := serviceManager()
 	if err != nil {
 		return err
@@ -164,9 +172,13 @@ func InstallTunnel(configPath string) error {
 		}
 	}
 
+	startType := uint32(mgr.StartAutomatic)
+	if ephemeral {
+		startType = uint32(mgr.StartManual)
+	}
 	config := mgr.Config{
 		ServiceType:  windows.SERVICE_WIN32_OWN_PROCESS,
-		StartType:    mgr.StartAutomatic,
+		StartType:    startType,
 		ErrorControl: mgr.ErrorNormal,
 		Dependencies: []string{"Nsi", "TcpIp"},
 		DisplayName:  "WireGuard Tunnel: " + name,
@@ -178,8 +190,39 @@ func InstallTunnel(configPath string) error {
 	}
 
 	err = service.Start()
-	go trackTunnelService(name, service) // Pass off reference to handle.
-	return err
+	if err != nil {
+		_ = service.Delete()
+		_ = service.Close()
+		return err
+	}
+	if !ephemeral {
+		go trackTunnelService(name, service) // Pass off reference to handle.
+		return nil
+	}
+
+	defer service.Close()
+	deadline := time.Now().Add(45 * time.Second)
+	for {
+		status, queryErr := service.Query()
+		if queryErr != nil {
+			_, _ = service.Control(svc.Stop)
+			_ = service.Delete()
+			return queryErr
+		}
+		switch status.State {
+		case svc.Running:
+			return service.Delete()
+		case svc.Stopped:
+			_ = service.Delete()
+			return errors.New("Tunnel stopped before startup completed")
+		}
+		if time.Now().After(deadline) {
+			_, _ = service.Control(svc.Stop)
+			_ = service.Delete()
+			return errors.New("Tunnel startup timed out")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 func UninstallTunnel(name string) error {
@@ -192,6 +235,9 @@ func UninstallTunnel(name string) error {
 		return err
 	}
 	service, err := m.OpenService(serviceName)
+	if err == windows.ERROR_SERVICE_DOES_NOT_EXIST {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
