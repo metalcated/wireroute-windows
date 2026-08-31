@@ -122,7 +122,7 @@ func UninstallManager() error {
 }
 
 func InstallTunnel(configPath string) error {
-	return installTunnel(configPath, false)
+	return installTunnel(configPath, false, "")
 }
 
 func InstallWireRoutePersistentTunnel(configPath, profileID string) error {
@@ -134,6 +134,7 @@ func InstallWireRoutePersistentTunnel(configPath, profileID string) error {
 	if err != nil {
 		return err
 	}
+	metricsPath := filepath.Join(filepath.Dir(configPath), "tunnel.metrics")
 	return elevate.DoAsSystem(func() error {
 		var previous *conf.Config
 		existing, loadErr := conf.LoadFromName(config.Name)
@@ -160,7 +161,7 @@ func InstallWireRoutePersistentTunnel(configPath, profileID string) error {
 		}
 		path, err := config.Path()
 		if err == nil {
-			err = InstallTunnel(path)
+			err = installTunnel(path, false, metricsPath)
 		}
 		if err == nil {
 			return nil
@@ -226,10 +227,13 @@ func wireRoutePersistentProfileMatches(config *conf.Config, profileID string) bo
 }
 
 func InstallEphemeralTunnel(configPath string) error {
-	return installTunnel(configPath, true)
+	return installTunnel(
+		configPath,
+		true,
+		filepath.Join(filepath.Dir(configPath), "tunnel.metrics"))
 }
 
-func installTunnel(configPath string, ephemeral bool) error {
+func installTunnel(configPath string, ephemeral bool, metricsPath string) error {
 	m, err := serviceManager()
 	if err != nil {
 		return err
@@ -289,10 +293,10 @@ func installTunnel(configPath string, ephemeral bool) error {
 		SidType:      windows.SERVICE_SID_TYPE_UNRESTRICTED,
 	}
 	serviceArguments := []string{"/tunnelservice", configPath}
-	if ephemeral {
+	if metricsPath != "" {
 		// WireRoute creates this sibling file before elevation. The tunnel service
 		// writes only sanitized byte counters and handshake time to it.
-		serviceArguments = append(serviceArguments, filepath.Join(filepath.Dir(configPath), "tunnel.metrics"))
+		serviceArguments = append(serviceArguments, metricsPath)
 	}
 	service, err = m.CreateService(serviceName, path, config, serviceArguments...)
 	if err != nil {

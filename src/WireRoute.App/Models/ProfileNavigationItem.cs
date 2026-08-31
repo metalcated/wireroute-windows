@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Routing;
@@ -6,8 +8,12 @@ using WireRoute.App.Interop;
 
 namespace WireRoute.App.Models;
 
-public sealed class ProfileNavigationItem
+public sealed class ProfileNavigationItem : INotifyPropertyChanged
 {
+    private string name = string.Empty;
+    private string status = string.Empty;
+    private string routingLabel = string.Empty;
+
     public ProfileNavigationItem(WireRouteStoredProfile storedProfile, WireGuardProfile profile)
         : this(profile, displayName: storedProfile.Name)
     {
@@ -43,11 +49,25 @@ public sealed class ProfileNavigationItem
 
     public WireRouteStoredProfile? StoredProfile { get; private set; }
 
-    public string Name { get; set; }
+    public string Name
+    {
+        get => name;
+        set => SetField(ref name, value);
+    }
 
-    public string Status { get; set; }
+    public string Status
+    {
+        get => status;
+        set => SetField(ref status, value);
+    }
 
-    public string RoutingLabel { get; set; }
+    public string RoutingLabel
+    {
+        get => routingLabel;
+        set => SetField(ref routingLabel, value);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     internal string? ManagerName { get; }
 
@@ -102,4 +122,17 @@ public sealed class ProfileNavigationItem
         ManagerTunnelState.Stopped => "Disconnected",
         _ => "Status unavailable",
     };
+
+    private void SetField(
+        ref string field,
+        string value,
+        [CallerMemberName] string? propertyName = null)
+    {
+        if (field.Equals(value, StringComparison.Ordinal))
+        {
+            return;
+        }
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }

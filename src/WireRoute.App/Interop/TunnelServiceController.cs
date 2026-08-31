@@ -166,6 +166,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         var configurationPath = Path.Combine(operationDirectory, profile.TunnelName + ".conf");
         var metricsPath = Path.Combine(operationDirectory, "tunnel.metrics");
         var logPath = Path.Combine(operationDirectory, "tunnel.log");
+        var serviceStartAccepted = false;
         Directory.CreateDirectory(operationDirectory);
         try
         {
@@ -193,6 +194,11 @@ internal sealed class TunnelServiceController : IAsyncDisposable
                 configurationPath,
                 cancellationToken,
                 persistent ? profile.Id.ToString("N") : null);
+            serviceStartAccepted = true;
+            await WaitForStateAsync(
+                profile.TunnelName,
+                LocalTunnelState.Active,
+                cancellationToken);
         }
         catch
         {
@@ -200,8 +206,11 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             {
                 await dnsProxy.StopAsync(profile.TunnelName);
             }
-            TryDelete(metricsPath);
-            TryDeleteDirectory(operationDirectory);
+            if (!serviceStartAccepted || GetState(profile.TunnelName) == LocalTunnelState.Inactive)
+            {
+                TryDelete(metricsPath);
+                TryDeleteDirectory(operationDirectory);
+            }
             throw;
         }
         finally
@@ -222,6 +231,10 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             profile.TunnelName,
             cancellationToken,
             persistent ? profile.Id.ToString("N") : null);
+        await WaitForStateAsync(
+            profile.TunnelName,
+            LocalTunnelState.Inactive,
+            cancellationToken);
         await dnsProxy.StopAsync(profile.TunnelName);
         var operationDirectory = RuntimeDirectory(profile);
         TryDelete(Path.Combine(operationDirectory, "tunnel.metrics"));
@@ -292,7 +305,8 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             var snapshot = JsonSerializer.Deserialize<TunnelRuntimeMetricsPayload>(stream);
             if (snapshot?.Version != 1)
             {
-                throw new InvalidDataException("The tunnel is still publishing its first sample.");
+                error = "The tunnel is still publishing its first sample.";
+                return false;
             }
             DateTimeOffset? lastHandshake = null;
             if (snapshot.LastHandshakeFileTime > 0
@@ -308,11 +322,15 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             return true;
         }
         catch (Exception exception) when (
-            exception is IOException
-                or UnauthorizedAccessException
-                or JsonException
+            exception is JsonException
                 or InvalidDataException
                 or ArgumentOutOfRangeException)
+        {
+            error = exception.Message;
+            return false;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
         {
             error = exception.Message;
         }
@@ -435,6 +453,34 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         {
             throw new OperationCanceledException("The Windows elevation request was canceled.", exception);
         }
+    }
+
+    private async Task WaitForStateAsync(
+        string profileName,
+        LocalTunnelState expectedState,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(45);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var state = GetState(profileName);
+            if (state == expectedState)
+            {
+                return;
+            }
+            if (expectedState == LocalTunnelState.Active
+                && state == LocalTunnelState.Inactive)
+            {
+                throw new InvalidOperationException(
+                    "The tunnel service stopped before activation completed. Review the WireRoute log for details.");
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
+
+        throw new TimeoutException(
+            expectedState == LocalTunnelState.Active
+                ? "The tunnel did not finish activating within 45 seconds."
+                : "The tunnel did not finish disconnecting within 45 seconds.");
     }
 
     private static string ServiceName(string profileName) => "WireGuardTunnel$" + profileName;

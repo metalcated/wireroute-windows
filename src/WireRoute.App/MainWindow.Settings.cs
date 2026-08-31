@@ -173,6 +173,7 @@ public sealed partial class MainWindow
             or InvalidOperationException
             or IOException
             or OperationCanceledException
+            or TimeoutException
             or System.ComponentModel.Win32Exception)
         {
             await ShowMessageAsync("Settings could not be saved", exception.Message);

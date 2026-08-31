@@ -93,11 +93,11 @@
                                 </Grid.ColumnDefinitions>
                                 <Ellipse Width="7" Height="7" Fill="{StaticResource NordicTertiaryTextBrush}" />
                                 <StackPanel Grid.Column="1" Margin="10,0,8,0" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock
                                         Foreground="{StaticResource NordicSecondaryTextBrush}"
                                         FontSize="11"
-                                        Text="{x:Bind Status}" />
+                                        Text="{x:Bind Status, Mode=OneWay}" />
                                 </StackPanel>
                                 <Border
                                     Grid.Column="2"
@@ -112,7 +112,7 @@
                                         VerticalAlignment="Center"
                                         Foreground="{StaticResource NordicSecondaryTextBrush}"
                                         FontSize="10"
-                                        Text="{x:Bind RoutingLabel}" />
+                                        Text="{x:Bind RoutingLabel, Mode=OneWay}" />
                                 </Border>
                             </Grid>
                         </DataTemplate>
