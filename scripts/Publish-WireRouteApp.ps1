@@ -52,7 +52,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $targetDirectory = ([string]::Join([Environment]::NewLine, $targetDirectoryOutput)).Trim()
-foreach ($resourceFile in @('WireRoute.App.pri', 'App.xbf', 'MainWindow.xbf')) {
+foreach ($resourceFile in @('WireRoute.pri', 'App.xbf', 'MainWindow.xbf')) {
     $resourcePath = Join-Path $targetDirectory $resourceFile
     if (-not (Test-Path -LiteralPath $resourcePath -PathType Leaf)) {
         throw "WireRoute.App architecture build output is missing $resourceFile."
@@ -62,9 +62,9 @@ foreach ($resourceFile in @('WireRoute.App.pri', 'App.xbf', 'MainWindow.xbf')) {
 }
 
 $requiredFiles = @(
-    'WireRoute.App.exe',
-    'WireRoute.App.dll',
-    'WireRoute.App.pri',
+    'WireRoute.exe',
+    'WireRoute.dll',
+    'WireRoute.pri',
     'App.xbf',
     'MainWindow.xbf',
     'Assets\wireroute.ico',

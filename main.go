@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -168,8 +169,16 @@ func wireRouteUIAvailable() bool {
 	if err != nil {
 		return false
 	}
-	info, err := os.Stat(filepath.Join(filepath.Dir(path), "WireRoute.App.exe"))
+	info, err := os.Stat(filepath.Join(filepath.Dir(path), "WireRoute.exe"))
 	return err == nil && info.Mode().IsRegular()
+}
+
+func launchWireRouteUI() error {
+	path, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	return exec.Command(filepath.Join(filepath.Dir(path), "WireRoute.exe")).Start()
 }
 
 func main() {
@@ -181,6 +190,12 @@ func main() {
 	checkForWow64()
 
 	if len(os.Args) <= 1 {
+		if wireRouteUIAvailable() {
+			if err := launchWireRouteUI(); err != nil {
+				fatal(err)
+			}
+			return
+		}
 		if ui.RaiseUI() {
 			return
 		}

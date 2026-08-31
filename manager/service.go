@@ -150,7 +150,7 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 		defer runToken.Close()
 		userToken = 0
 
-		wireRoutePath := filepath.Join(filepath.Dir(path), "WireRoute.App.exe")
+		wireRoutePath := filepath.Join(filepath.Dir(path), "WireRoute.exe")
 		wireRouteRunToken := runToken
 		closeWireRouteRunToken := false
 		useWireRoute := false
