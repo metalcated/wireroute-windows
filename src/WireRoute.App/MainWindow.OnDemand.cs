@@ -1,5 +1,6 @@
 using Windows.Networking.Connectivity;
 using WireRoute.App.Interop;
+using WireRoute.App.Models;
 using WireRoute.Storage;
 
 namespace WireRoute.App;
@@ -38,7 +39,7 @@ public sealed partial class MainWindow
     private async Task EvaluateOnDemandAsync()
     {
         if (DateTimeOffset.UtcNow < nextOnDemandAttempt
-            || Profiles.Any(profile => profile.IsActive || profile.IsTransitioning)
+            || Profiles.Any(profile => profile.IsTransitioning)
             || !await onDemandGate.WaitAsync(0))
         {
             return;
@@ -55,12 +56,39 @@ public sealed partial class MainWindow
                 || profile.NetworkAdapter?.IanaInterfaceType == 71);
             var hasEthernet = connections.Any(profile =>
                 profile.NetworkAdapter?.IanaInterfaceType == 6);
+            bool MatchesCurrentNetwork(ProfileNavigationItem profile) =>
+                profile.StoredProfile is not null
+                && (profile.StoredProfile.OnDemandWiFi && hasWiFi
+                    || profile.StoredProfile.OnDemandEthernet && hasEthernet);
+
+            var activeOnDemandProfile = Profiles.FirstOrDefault(profile =>
+                profile.IsStoredLocally
+                && !profile.IsManaged
+                && profile.IsActive
+                && profile.StoredProfile is not null
+                && (profile.StoredProfile.OnDemandWiFi || profile.StoredProfile.OnDemandEthernet));
+            if (activeOnDemandProfile is not null
+                && !MatchesCurrentNetwork(activeOnDemandProfile))
+            {
+                nextOnDemandAttempt = DateTimeOffset.UtcNow.AddMinutes(1);
+                await RecordActivityAsync(
+                    WireRouteActivityKind.OnDemandUnmatched,
+                    activeOnDemandProfile,
+                    "On-Demand no longer matches the current Windows network.");
+                await ToggleLocalProfileAsync(activeOnDemandProfile);
+                return;
+            }
+
+            if (Profiles.Any(profile => profile.IsActive))
+            {
+                return;
+            }
+
             var candidate = Profiles.FirstOrDefault(profile =>
                 profile.StoredProfile is not null
                 && !profile.IsManaged
                 && localTunnelController.GetState(profile.Name) == LocalTunnelState.Inactive
-                && (profile.StoredProfile.OnDemandWiFi && hasWiFi
-                    || profile.StoredProfile.OnDemandEthernet && hasEthernet));
+                && MatchesCurrentNetwork(profile));
             if (candidate is null)
             {
                 return;

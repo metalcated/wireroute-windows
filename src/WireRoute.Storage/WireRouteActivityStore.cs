@@ -14,6 +14,7 @@ public enum WireRouteActivityKind
     OnDemandMatched,
     TunnelError,
     RouterOSProfileCreated,
+    OnDemandUnmatched,
 }
 
 public sealed record WireRouteActivityEntry(

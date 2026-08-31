@@ -313,7 +313,11 @@ public sealed partial class MainWindow
             nameBox.Focus(FocusState.Programmatic);
             nameBox.SelectAll();
         });
-        await modal;
+        var result = await modal;
+        if (result == WireRouteModalResult.Primary)
+        {
+            await EvaluateOnDemandAsync();
+        }
     }
 
     private async void ProfileSplitButton_Click(object sender, RoutedEventArgs e)
