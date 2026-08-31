@@ -8,6 +8,7 @@ using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using WireRoute.App.Models;
+using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
 
@@ -17,9 +18,14 @@ public sealed partial class MainWindow : Window
 {
     private readonly AppWindow appWindow;
     private readonly nint windowHandle;
+    private readonly ManagerProtocolClient? managerClient;
+    private readonly string? managerLaunchError;
+    private ProfileNavigationItem? selectedProfile;
 
-    public MainWindow()
+    public MainWindow(ManagerProtocolClient? managerClient = null, string? managerLaunchError = null)
     {
+        this.managerClient = managerClient;
+        this.managerLaunchError = managerLaunchError;
         InitializeComponent();
         Profiles.CollectionChanged += (_, _) => UpdateProfilesEmptyState();
 
@@ -29,6 +35,8 @@ public sealed partial class MainWindow : Window
         ConfigureWindow();
         UpdateProfilesEmptyState();
         _ = LoadRouterOSConnectionsAsync();
+        _ = InitializeManagerAsync();
+        Closed += MainWindow_Closed;
     }
 
     public ObservableCollection<ProfileNavigationItem> Profiles { get; } = [];
@@ -134,15 +142,40 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ProfilesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ProfilesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ProfilesList.SelectedItem is ProfileNavigationItem item)
         {
-            ShowProfile(item.Profile);
+            selectedProfile = item;
+            await ShowProfileAsync(item);
         }
     }
 
-    private void ShowProfile(WireGuardProfile profile)
+    private async Task ShowProfileAsync(ProfileNavigationItem item)
+    {
+        if (item.Profile is not null)
+        {
+            ShowProfile(item, item.Profile);
+            return;
+        }
+
+        if (item.ManagerName is not null && managerClient is not null)
+        {
+            try
+            {
+                var detail = await managerClient.RequestAsync<ManagerGetProfileRequest, ManagerProfileDetail>(
+                    ManagerMethods.GetProfile,
+                    new ManagerGetProfileRequest(item.ManagerName));
+                ShowManagerProfile(item, detail);
+            }
+            catch (Exception exception)
+            {
+                await ShowMessageAsync("Profile details are unavailable", exception.Message);
+            }
+        }
+    }
+
+    private void ShowProfile(ProfileNavigationItem item, WireGuardProfile profile)
     {
         ProfileEmptyPanel.Visibility = Visibility.Collapsed;
         ProfileDetailPanel.Visibility = Visibility.Visible;
@@ -151,7 +184,8 @@ public sealed partial class MainWindow : Window
         SetSelectedState(RouterOSButton, RouterOSRail, false);
         SetSelectedState(SettingsButton, SettingsRail, false);
 
-        ProfileNameText.Text = profile.Name;
+        ProfileNameText.Text = item.Name;
+        SetProfileManagerControls(item);
         ProfileEndpointText.Text = DisplayList(
             profile.Peers
                 .Select(peer => peer.Endpoint?.DisplayValue)
@@ -167,6 +201,30 @@ public sealed partial class MainWindow : Window
             $"{server.Address} — {(server.Route == DnsServerRoute.ThroughTunnel ? "Through tunnel" : "Outside tunnel")}"));
         ProfileDnsSearchText.Text = DisplayList(profile.Interface.DnsSearchDomains);
         HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ShowManagerProfile(ProfileNavigationItem item, ManagerProfileDetail profile)
+    {
+        ProfileEmptyPanel.Visibility = Visibility.Collapsed;
+        ProfileDetailPanel.Visibility = Visibility.Visible;
+        RouterOSPanel.Visibility = Visibility.Collapsed;
+        SettingsPanel.Visibility = Visibility.Collapsed;
+        SetSelectedState(RouterOSButton, RouterOSRail, false);
+        SetSelectedState(SettingsButton, SettingsRail, false);
+
+        ProfileNameText.Text = item.Name;
+        SetProfileManagerControls(item);
+        ProfileEndpointText.Text = DisplayList(profile.Peers.Select(peer => peer.Endpoint).Where(value => value is not null).Select(value => value!));
+        ProfileAddressesText.Text = DisplayList(profile.InterfaceAddresses);
+        ProfilePeersText.Text = profile.Peers.Count == 1 ? "1 peer" : $"{profile.Peers.Count} peers";
+        ProfileRoutingModeText.Text = profile.DetectedRouteMode == TunnelRouteMode.Full
+            ? "Full routing"
+            : "Split routing";
+        ProfileRoutesText.Text = DisplayList(profile.Peers.SelectMany(peer => peer.AllowedIps));
+        ProfileDnsServersText.Text = DisplayList(profile.DnsServers.Select(server =>
+            $"{server.Address} — {(server.Route == DnsServerRoute.ThroughTunnel ? "Through tunnel" : "Outside tunnel")}"));
+        ProfileDnsSearchText.Text = DisplayList(profile.DnsSearchDomains);
+        HooksWarningBorder.Visibility = profile.HasHooks ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static string DisplayList(IEnumerable<string> values)

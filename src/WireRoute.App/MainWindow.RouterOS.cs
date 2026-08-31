@@ -137,6 +137,7 @@ public sealed partial class MainWindow
                 RouterOSConnectButton,
                 "Connected to this router. Click to refresh discovery.");
             RouterOSShowAllPeersCheckBox.IsEnabled = routerOSPeers.Count > 0;
+            UpdateRouterOSManagerAvailability();
             SetRouterOSStatus("Discovery completed securely with no RouterOS changes.", isSuccess: true);
         }
         catch (RouterOSTlsCertificateException exception) when (allowCertificateReview)
