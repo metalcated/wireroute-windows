@@ -48,6 +48,7 @@ public sealed partial class MainWindow : Window
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadStoredProfilesAsync();
+        _ = LoadSettingsAsync();
         _ = LoadRouterOSConnectionsAsync();
         _ = InitializeManagerAsync();
         Closed += MainWindow_Closed;

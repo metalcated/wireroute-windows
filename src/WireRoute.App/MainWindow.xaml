@@ -575,51 +575,58 @@
             </ScrollViewer>
 
             <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed">
-                <StackPanel MaxWidth="820" HorizontalAlignment="Center" Spacing="18">
+                <StackPanel MaxWidth="980" HorizontalAlignment="Center" Spacing="18">
                     <StackPanel Spacing="5">
-                        <TextBlock FontFamily="Segoe UI Variable Display" FontSize="28" FontWeight="SemiBold" Text="Settings" />
+                        <TextBlock FontFamily="Segoe UI Variable Display" FontSize="28" FontWeight="Bold" Text="WireRoute Settings" />
                         <TextBlock
                             Foreground="{StaticResource NordicSecondaryTextBrush}"
-                            Text="Manage how WireRoute looks, stores local activity, and handles diagnostics and support."
+                            Text="Manage RouterOS connections, choose how WireRoute appears, and prefill new client profiles."
                             TextWrapping="Wrap" />
                     </StackPanel>
-                    <Border Style="{StaticResource NordicCardStyle}">
+                    <TextBlock Margin="0,6,-0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="Appearance" />
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="24">
                         <StackPanel Spacing="16">
-                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Appearance" />
                             <Grid ColumnSpacing="24">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="360" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="3">
-                                    <TextBlock Text="Theme" />
-                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Nordic Blue is the default dark navy interface." />
+                                    <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="Theme" />
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Blue Nordic is the default dark navy interface. System follows Windows." TextAlignment="Right" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ComboBox Grid.Column="1" IsEnabled="False" SelectedIndex="0" HorizontalAlignment="Stretch">
-                                    <ComboBoxItem Content="Nordic Blue" />
+                                <ComboBox x:Name="SettingsThemePicker" Grid.Column="1" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Blue Nordic" />
                                     <ComboBoxItem Content="System" />
                                 </ComboBox>
                             </Grid>
                             <Grid ColumnSpacing="24">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="360" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="3">
-                                    <TextBlock Text="Windows tray icon" />
-                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Keep WireRoute available from the notification area." />
+                                    <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="Windows tray icon" />
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Default follows Windows automatically. Contrast variants remain fixed." TextAlignment="Right" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ToggleSwitch Grid.Column="1" IsEnabled="False" />
+                                <ComboBox x:Name="SettingsTrayIconPicker" Grid.Column="1" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Default" />
+                                    <ComboBoxItem Content="WireRoute Color" />
+                                    <ComboBoxItem Content="Clear Outline" />
+                                    <ComboBoxItem Content="Dark" />
+                                    <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Legacy WireGuard" />
+                                </ComboBox>
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="RouterOS Connections" />
                     <Border Style="{StaticResource NordicCardStyle}">
                         <StackPanel Spacing="12">
-                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="RouterOS Connections" />
                             <TextBlock
                                 Foreground="{StaticResource NordicSecondaryTextBrush}"
                                 FontSize="12"
-                                Text="Saved connections and passwords will use protected Windows credential storage. Read-only interface loading never changes RouterOS."
+                                Text="Add each RouterOS router you want to manage. Passwords stay protected with Windows DPAPI; choose a saved connection from RouterOS Peers when connecting."
                                 TextWrapping="Wrap" />
                             <Border
                                 MinHeight="128"
@@ -641,11 +648,13 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="1.1*" />
                                                         <ColumnDefinition Width="1.5*" />
-                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="0.8*" />
+                                                        <ColumnDefinition Width="0.9*" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Grid.Column="1" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding DefaultInterface}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Username}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="3" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding DefaultInterface}" TextTrimming="CharacterEllipsis" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
@@ -666,13 +675,45 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="Peer Defaults" />
                     <Border Style="{StaticResource NordicCardStyle}">
-                        <StackPanel Spacing="12">
-                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Data and diagnostics" />
-                            <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Activity stays on this device. Retention, logs, and export are connected in later milestones." TextWrapping="Wrap" />
-                            <Button IsEnabled="False" HorizontalAlignment="Left" Content="View logs and diagnostics" />
-                        </StackPanel>
+                        <Grid RowSpacing="12" ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Text="Preferred endpoint" />
+                            <StackPanel Grid.Column="1" Spacing="3">
+                                <TextBox x:Name="SettingsPreferredEndpointBox" PlaceholderText="vpn.example.com" />
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" Text="Optional. Leave blank to use one public IPv4 address discovered from RouterOS when unambiguous." TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Text="DNS servers" />
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="3">
+                                <TextBox x:Name="SettingsDnsServersBox" PlaceholderText="192.168.80.45, 192.168.80.46" />
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" Text="Optional DNS addresses to include in new client profiles." />
+                            </StackPanel>
+                            <TextBlock Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Text="Split tunnel routes" />
+                            <StackPanel Grid.Row="2" Grid.Column="1" Spacing="3">
+                                <TextBox x:Name="SettingsSplitRoutesBox" PlaceholderText="Networks or destinations, separated by commas" />
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" Text="Optional routes to prefill when Split mode is selected." />
+                            </StackPanel>
+                            <TextBlock Grid.Row="3" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Text="Keepalive" />
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <NumberBox x:Name="SettingsKeepaliveBox" Width="120" Minimum="0" Maximum="65535" SpinButtonPlacementMode="Compact" />
+                                <TextBlock VerticalAlignment="Center" Text="seconds" />
+                            </StackPanel>
+                        </Grid>
                     </Border>
+                    <Grid>
+                        <Button HorizontalAlignment="Left" Click="SettingsRestoreDefaultsButton_Click" Content="Restore Defaults" />
+                        <Button HorizontalAlignment="Right" Click="SettingsSaveButton_Click" Content="Save Changes" Style="{StaticResource NordicAccentButtonStyle}" />
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

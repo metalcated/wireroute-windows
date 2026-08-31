@@ -10,6 +10,37 @@ namespace WireRoute.Storage.Tests;
 public sealed class ProtectedRouterOSStorageTests
 {
     [TestMethod]
+    public async Task SettingsStoreRoundTripsPeerDefaults()
+    {
+        var directory = NewStorageDirectory();
+        try
+        {
+            var store = new WireRouteSettingsStore(directory);
+            var settings = new WireRouteAppSettings(
+                "Blue Nordic",
+                "WireRoute Color",
+                "vpn.example.com",
+                "192.0.2.53, 192.0.2.54",
+                "10.20.0.0/16",
+                30);
+
+            await store.SaveAsync(settings);
+
+            Assert.AreEqual(settings, await store.LoadAsync());
+            var protectedText = Encoding.UTF8.GetString(
+                await File.ReadAllBytesAsync(Path.Combine(directory, "settings.dpapi")));
+            Assert.IsFalse(protectedText.Contains("vpn.example.com", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
     public async Task ProfileStoreProtectsAndRoundTripsConfiguration()
     {
         var directory = NewStorageDirectory();

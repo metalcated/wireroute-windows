@@ -69,10 +69,14 @@ public sealed partial class MainWindow
             InterfaceName = selectedInterface.Name,
             ClientAddress = addressSuggestion?.Address.Notation ?? string.Empty,
             LastSuggestedClientAddress = addressSuggestion?.Address.Notation,
-            EndpointAddress = routerOSPublicEndpointSuggestion?.Address ?? string.Empty,
+            EndpointAddress = string.IsNullOrWhiteSpace(appSettings.PreferredEndpoint)
+                ? routerOSPublicEndpointSuggestion?.Address ?? string.Empty
+                : appSettings.PreferredEndpoint,
             EndpointPort = selectedInterface.ListenPort?.ToString() ?? string.Empty,
             LastSuggestedEndpointPort = selectedInterface.ListenPort?.ToString(),
-            PersistentKeepalive = "25",
+            DnsServers = appSettings.DnsServers,
+            Routes = appSettings.SplitTunnelRoutes,
+            PersistentKeepalive = appSettings.PersistentKeepalive.ToString(),
         };
     }
 

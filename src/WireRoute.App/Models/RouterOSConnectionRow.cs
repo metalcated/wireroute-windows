@@ -21,6 +21,7 @@ public sealed class RouterOSConnectionRow
         Id = connection.Id;
         Name = connection.Name;
         Url = connection.Url;
+        Username = connection.Username;
         DefaultInterface = connection.DefaultInterface ?? "Automatic";
     }
 
@@ -29,6 +30,8 @@ public sealed class RouterOSConnectionRow
     public string Name { get; set; }
 
     public string Url { get; set; }
+
+    public string Username { get; set; }
 
     public string DefaultInterface { get; set; }
 
