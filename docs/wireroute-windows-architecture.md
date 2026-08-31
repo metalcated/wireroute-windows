@@ -42,3 +42,5 @@
 4. Import and display real profiles without exposing private keys.
 5. Validate a real x64 tunnel before extending RouterOS or secondary settings.
 6. Validate the same tunnel path in a native ARM64 VM without emulation.
+
+The versioned protocol contract and C# framed-stream client are defined in `docs/manager-protocol-v1.md`. No manager implementation or launch behavior has been changed yet.
