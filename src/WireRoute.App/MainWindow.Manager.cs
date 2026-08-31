@@ -344,12 +344,12 @@ public sealed partial class MainWindow
 
     private async Task<ProfileNavigationItem> ImportGeneratedProfileAsync(
         string displayName,
-        string wgQuickConfiguration)
+        string wgQuickConfiguration,
+        Guid profileId,
+        string tunnelName)
     {
         if (managerClient is null || managerCapabilities?.CanImportProfiles != true)
         {
-            var profileId = Guid.NewGuid();
-            var tunnelName = WireRouteStoredProfile.CreateTunnelName(displayName, profileId);
             var localProfile = WireGuardConfigParser.Parse(wgQuickConfiguration, tunnelName);
             var now = DateTimeOffset.UtcNow;
             var storedProfile = new WireRouteStoredProfile(

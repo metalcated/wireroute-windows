@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
 using WireRoute.RouterOS;
 using WireRoute.Storage;
@@ -378,6 +379,9 @@ public sealed partial class MainWindow
             endpointPort,
             allowedIps,
             persistentKeepalive);
+        var profileId = Guid.NewGuid();
+        var tunnelName = WireRouteStoredProfile.CreateTunnelName(peerCreation.Name, profileId);
+        _ = WireGuardConfigParser.Parse(clientConfiguration.WgQuickConfiguration, tunnelName);
 
         state.InterfaceName = selectedInterface.Name;
         state.Name = name;
@@ -388,7 +392,11 @@ public sealed partial class MainWindow
         state.RouteModeIndex = routeModeIndex;
         state.Routes = routes;
         state.PersistentKeepalive = persistentKeepaliveText;
-        return new RouterOSPeerSetupProposal(peerCreation, clientConfiguration);
+        return new RouterOSPeerSetupProposal(
+            peerCreation,
+            clientConfiguration,
+            profileId,
+            tunnelName);
     }
 
     private Task<WireRouteModalResult> ShowRouterOSPeerReviewAsync(RouterOSPeerSetupProposal proposal)
@@ -463,7 +471,9 @@ public sealed partial class MainWindow
             {
                 _ = await ImportGeneratedProfileAsync(
                     proposal.ClientConfiguration.Name,
-                    proposal.ClientConfiguration.WgQuickConfiguration);
+                    proposal.ClientConfiguration.WgQuickConfiguration,
+                    proposal.ProfileId,
+                    proposal.TunnelName);
                 var cleanupMessage = await TryDeleteProfileRecoveryAsync(recovery.Id);
                 SetRouterOSStatus("Peer created and profile loaded into WireRoute.", isSuccess: true);
                 if (cleanupMessage.Length > 0)
@@ -667,5 +677,7 @@ public sealed partial class MainWindow
 
     private sealed record RouterOSPeerSetupProposal(
         RouterOSPeerCreation PeerCreation,
-        WireGuardClientConfiguration ClientConfiguration);
+        WireGuardClientConfiguration ClientConfiguration,
+        Guid ProfileId,
+        string TunnelName);
 }
