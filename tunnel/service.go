@@ -25,7 +25,8 @@ import (
 )
 
 type tunnelService struct {
-	Path string
+	Path        string
+	MetricsPath string
 }
 
 func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (svcSpecificEC bool, exitCode uint32) {
@@ -34,6 +35,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 
 	var watcher *interfaceWatcher
 	var adapter *driver.Adapter
+	var metricsMonitor *runtimeMetricsMonitor
 	var luid winipcfg.LUID
 	var config *conf.Config
 	var err error
@@ -82,6 +84,9 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 
 		if logErr == nil && adapter != nil && config != nil {
 			logErr = runScriptCommand(config.Interface.PreDown, config.Name)
+		}
+		if metricsMonitor != nil {
+			metricsMonitor.stopAndClose()
 		}
 		if watcher != nil {
 			watcher.Destroy()
@@ -211,6 +216,11 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 		serviceError = services.ErrorDeviceBringUp
 		return
 	}
+	metricsMonitor, err = startRuntimeMetricsMonitor(adapter, service.MetricsPath)
+	if err != nil {
+		log.Printf("Unable to start WireRoute runtime metrics: %v", err)
+		err = nil
+	}
 	watcher.Configure(adapter, config, luid)
 
 	err = runScriptCommand(config.Interface.PostUp, config.Name)
@@ -247,7 +257,7 @@ func (service *tunnelService) Execute(args []string, r <-chan svc.ChangeRequest,
 	}
 }
 
-func Run(confPath string) error {
+func Run(confPath string, metricsPath ...string) error {
 	name, err := conf.NameFromPath(confPath)
 	if err != nil {
 		return err
@@ -256,5 +266,9 @@ func Run(confPath string) error {
 	if err != nil {
 		return err
 	}
-	return svc.Run(serviceName, &tunnelService{confPath})
+	var path string
+	if len(metricsPath) > 0 {
+		path = metricsPath[0]
+	}
+	return svc.Run(serviceName, &tunnelService{Path: confPath, MetricsPath: path})
 }

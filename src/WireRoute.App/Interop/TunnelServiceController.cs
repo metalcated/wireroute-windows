@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using WireRoute.Core.Profiles;
 using WireRoute.Storage;
 
@@ -102,14 +103,20 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         var runtimeConfiguration = await PrepareRuntimeConfigurationAsync(
             profile,
             cancellationToken);
-        var operationDirectory = Path.Combine(runtimeRoot, Guid.NewGuid().ToString("N"));
+        var operationDirectory = RuntimeDirectory(profile);
         var configurationPath = Path.Combine(operationDirectory, profile.Name + ".conf");
+        var metricsPath = Path.Combine(operationDirectory, "tunnel.metrics");
         Directory.CreateDirectory(operationDirectory);
         try
         {
             await File.WriteAllTextAsync(
                 configurationPath,
                 runtimeConfiguration,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                cancellationToken);
+            await File.WriteAllTextAsync(
+                metricsPath,
+                "{\"version\":0}",
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken);
             await RunElevatedAsync(
@@ -123,24 +130,87 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             {
                 await dnsProxy.StopAsync(profile.Name);
             }
+            TryDelete(metricsPath);
+            TryDeleteDirectory(operationDirectory);
             throw;
         }
         finally
         {
             TryDelete(configurationPath);
-            TryDeleteDirectory(operationDirectory);
         }
     }
 
     public async Task StopAsync(
-        string profileName,
+        WireRouteStoredProfile profile,
         CancellationToken cancellationToken = default)
     {
         await RunElevatedAsync(
             "/stopephemeraltunnelservice",
-            profileName,
+            profile.Name,
             cancellationToken);
-        await dnsProxy.StopAsync(profileName);
+        await dnsProxy.StopAsync(profile.Name);
+        var operationDirectory = RuntimeDirectory(profile);
+        TryDelete(Path.Combine(operationDirectory, "tunnel.metrics"));
+        TryDeleteDirectory(operationDirectory);
+    }
+
+    public bool TryReadMetrics(
+        WireRouteStoredProfile profile,
+        out WireGuardTunnelMetrics? metrics,
+        out string? error)
+    {
+        metrics = null;
+        error = null;
+        var metricsPath = Path.Combine(RuntimeDirectory(profile), "tunnel.metrics");
+        try
+        {
+            using var stream = new FileStream(
+                metricsPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length is <= 0 or > 4096)
+            {
+                throw new InvalidDataException("The runtime metrics file has an invalid size.");
+            }
+            var snapshot = JsonSerializer.Deserialize<TunnelRuntimeMetricsPayload>(stream);
+            if (snapshot?.Version != 1)
+            {
+                throw new InvalidDataException("The tunnel is still publishing its first sample.");
+            }
+            DateTimeOffset? lastHandshake = null;
+            if (snapshot.LastHandshakeFileTime > 0
+                && snapshot.LastHandshakeFileTime <= long.MaxValue)
+            {
+                lastHandshake = new DateTimeOffset(
+                    DateTime.FromFileTimeUtc((long)snapshot.LastHandshakeFileTime));
+            }
+            metrics = new WireGuardTunnelMetrics(
+                snapshot.ReceivedBytes,
+                snapshot.SentBytes,
+                lastHandshake);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or JsonException
+                or InvalidDataException
+                or ArgumentOutOfRangeException)
+        {
+            error = exception.Message;
+        }
+
+        if (WireGuardRuntimeMetrics.TryRead(profile.Name, out metrics, out var adapterError))
+        {
+            error = null;
+            return true;
+        }
+        if (!string.IsNullOrWhiteSpace(adapterError))
+        {
+            error = error is null ? adapterError : error + " " + adapterError;
+        }
+        return false;
     }
 
     public bool HasActiveEncryptedDns(string profileName) =>
@@ -245,6 +315,15 @@ internal sealed class TunnelServiceController : IAsyncDisposable
     }
 
     private static string ServiceName(string profileName) => "WireGuardTunnel$" + profileName;
+
+    private string RuntimeDirectory(WireRouteStoredProfile profile) =>
+        Path.Combine(runtimeRoot, profile.Id.ToString("N"));
+
+    private sealed record TunnelRuntimeMetricsPayload(
+        int Version,
+        ulong ReceivedBytes,
+        ulong SentBytes,
+        ulong LastHandshakeFileTime);
 
     private static void TryDelete(string path)
     {

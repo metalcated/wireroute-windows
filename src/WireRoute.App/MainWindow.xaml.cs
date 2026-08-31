@@ -57,6 +57,7 @@ public sealed partial class MainWindow : Window
         };
         UpdateTrayIconAppearance();
         StartOnDemandMonitoring();
+        StartActivityMonitoring();
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadStoredProfilesAsync();

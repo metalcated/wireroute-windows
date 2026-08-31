@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -184,7 +185,13 @@ func installTunnel(configPath string, ephemeral bool) error {
 		DisplayName:  "WireGuard Tunnel: " + name,
 		SidType:      windows.SERVICE_SID_TYPE_UNRESTRICTED,
 	}
-	service, err = m.CreateService(serviceName, path, config, "/tunnelservice", configPath)
+	serviceArguments := []string{"/tunnelservice", configPath}
+	if ephemeral {
+		// WireRoute creates this sibling file before elevation. The tunnel service
+		// writes only sanitized byte counters and handshake time to it.
+		serviceArguments = append(serviceArguments, filepath.Join(filepath.Dir(configPath), "tunnel.metrics"))
+	}
+	service, err = m.CreateService(serviceName, path, config, serviceArguments...)
 	if err != nil {
 		return err
 	}

@@ -383,6 +383,16 @@
                                 <Rectangle Height="1" VerticalAlignment="Top" Fill="{StaticResource NordicBorderBrush}" />
                                 <Rectangle Height="1" VerticalAlignment="Center" Fill="{StaticResource NordicBorderBrush}" />
                                 <Rectangle Height="1" VerticalAlignment="Bottom" Fill="{StaticResource NordicBorderBrush}" />
+                                <Polyline
+                                    x:Name="ProfileDownloadLine"
+                                    Stroke="{StaticResource NordicAccentBrush}"
+                                    StrokeLineJoin="Round"
+                                    StrokeThickness="2" />
+                                <Polyline
+                                    x:Name="ProfileUploadLine"
+                                    Stroke="#19D3D1"
+                                    StrokeLineJoin="Round"
+                                    StrokeThickness="2" />
                                 <TextBlock x:Name="ProfileActivityText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Connect this profile to begin recording traffic." />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="18">

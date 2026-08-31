@@ -75,7 +75,7 @@ func usage() {
 		"/uninstalltunnelservice TUNNEL_NAME",
 		"/stopephemeraltunnelservice TUNNEL_NAME",
 		"/managerservice",
-		"/tunnelservice CONFIG_PATH",
+		"/tunnelservice CONFIG_PATH [METRICS_PATH]",
 		"/ui CMD_READ_HANDLE CMD_WRITE_HANDLE CMD_EVENT_HANDLE LOG_MAPPING_HANDLE",
 		"/dumplog [/tail]",
 		"/update",
@@ -284,10 +284,14 @@ func main() {
 		}
 		return
 	case "/tunnelservice":
-		if len(os.Args) != 3 {
+		if len(os.Args) != 3 && len(os.Args) != 4 {
 			usage()
 		}
-		err := tunnel.Run(os.Args[2])
+		var metricsPath string
+		if len(os.Args) == 4 {
+			metricsPath = os.Args[3]
+		}
+		err := tunnel.Run(os.Args[2], metricsPath)
 		if err != nil {
 			fatal(err)
 		}

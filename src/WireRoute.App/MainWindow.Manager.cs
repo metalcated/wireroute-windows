@@ -238,7 +238,7 @@ public sealed partial class MainWindow
         {
             if (wasActive)
             {
-                await localTunnelController.StopAsync(item.Name, managerCancellation.Token);
+                await localTunnelController.StopAsync(item.StoredProfile, managerCancellation.Token);
             }
             else
             {
@@ -424,6 +424,7 @@ public sealed partial class MainWindow
 
     private async void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        StopActivityMonitoring();
         StopOnDemandMonitoring();
         trayIcon.Dispose();
         managerCancellation.Cancel();
