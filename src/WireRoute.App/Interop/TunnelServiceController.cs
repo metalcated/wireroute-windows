@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using WireRoute.Core.Profiles;
+using WireRoute.Core.Telemetry;
 using WireRoute.Storage;
 
 namespace WireRoute.App.Interop;
@@ -302,7 +303,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             {
                 throw new InvalidDataException("The runtime metrics file has an invalid size.");
             }
-            var snapshot = JsonSerializer.Deserialize<TunnelRuntimeMetricsPayload>(stream);
+            var snapshot = JsonSerializer.Deserialize<WireRouteRuntimeMetricsSnapshot>(stream);
             if (snapshot?.Version != 1)
             {
                 error = "The tunnel is still publishing its first sample.";
@@ -487,12 +488,6 @@ internal sealed class TunnelServiceController : IAsyncDisposable
 
     private string RuntimeDirectory(WireRouteStoredProfile profile) =>
         Path.Combine(runtimeRoot, profile.Id.ToString("N"));
-
-    private sealed record TunnelRuntimeMetricsPayload(
-        int Version,
-        ulong ReceivedBytes,
-        ulong SentBytes,
-        ulong LastHandshakeFileTime);
 
     private static void TryDelete(string path)
     {
