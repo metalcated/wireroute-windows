@@ -55,6 +55,7 @@ public sealed partial class MainWindow : Window
         {
             UpdateProfilesEmptyState();
             UpdateTrayIconAppearance();
+            UpdatePersistentTunnelStatusText(appSettings.PersistentTunnelService);
         };
         UpdateTrayIconAppearance();
         StartOnDemandMonitoring();
@@ -65,10 +66,6 @@ public sealed partial class MainWindow : Window
         _ = LoadSettingsAsync();
         _ = LoadRouterOSConnectionsAsync();
         _ = InitializeManagerAsync();
-        _ = RecordActivityAsync(
-            WireRouteActivityKind.AppStarted,
-            null,
-            "WireRoute started in service-free mode.");
         Closed += MainWindow_Closed;
     }
 

@@ -8,7 +8,8 @@ public sealed record WireRouteAppSettings(
     string PreferredEndpoint,
     string DnsServers,
     string SplitTunnelRoutes,
-    int PersistentKeepalive)
+    int PersistentKeepalive,
+    bool PersistentTunnelService)
 {
     public static WireRouteAppSettings Defaults { get; } = new(
         "Blue Nordic",
@@ -16,7 +17,8 @@ public sealed record WireRouteAppSettings(
         string.Empty,
         string.Empty,
         string.Empty,
-        25);
+        25,
+        false);
 }
 
 [SupportedOSPlatform("windows")]

@@ -169,7 +169,9 @@ public sealed partial class MainWindow
             };
             ToolTipService.SetToolTip(
                 ProfileConnectButton,
-                "Activate with WireGuardNT. Windows asks for approval only when starting or stopping this tunnel.");
+                appSettings.PersistentTunnelService
+                    ? "Activate with WireGuardNT as an automatic tunnel service that can survive sign-out and restart."
+                    : "Activate with WireGuardNT. Windows asks for approval only when starting or stopping this tunnel.");
             return;
         }
 
@@ -242,7 +244,10 @@ public sealed partial class MainWindow
             }
             else
             {
-                await localTunnelController.StartAsync(item.StoredProfile, managerCancellation.Token);
+                await localTunnelController.StartAsync(
+                    item.StoredProfile,
+                    appSettings.PersistentTunnelService,
+                    managerCancellation.Token);
             }
             item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
             await RecordActivityAsync(
@@ -252,7 +257,9 @@ public sealed partial class MainWindow
                 item,
                 wasActive
                     ? "Disconnected the tunnel."
-                    : "Activated the tunnel with WireGuardNT.");
+                    : appSettings.PersistentTunnelService
+                        ? "Activated the tunnel with WireGuardNT as an automatic persistent service."
+                        : "Activated the tunnel with WireGuardNT for the current session.");
         }
         catch (OperationCanceledException exception)
         {

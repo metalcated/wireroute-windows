@@ -18,7 +18,10 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"golang.zx2c4.com/wireguard/windows/conf"
+	"golang.zx2c4.com/wireguard/windows/elevate"
 )
+
+const wireRoutePersistentProfileComment = "# WireRoute-Persistent-Profile: "
 
 var cachedServiceManager *mgr.Mgr
 
@@ -120,6 +123,106 @@ func UninstallManager() error {
 
 func InstallTunnel(configPath string) error {
 	return installTunnel(configPath, false)
+}
+
+func InstallWireRoutePersistentTunnel(configPath, profileID string) error {
+	profileID, err := normalizeWireRouteProfileID(profileID)
+	if err != nil {
+		return err
+	}
+	config, err := conf.LoadFromPath(configPath)
+	if err != nil {
+		return err
+	}
+	return elevate.DoAsSystem(func() error {
+		var previous *conf.Config
+		existing, loadErr := conf.LoadFromName(config.Name)
+		if loadErr == nil {
+			if !wireRoutePersistentProfileMatches(existing, profileID) {
+				return errors.New("a different protected tunnel profile already uses this Windows service name")
+			}
+			previous = existing
+		} else if !os.IsNotExist(loadErr) {
+			return loadErr
+		}
+
+		comments := config.TrailingComments[:0]
+		for _, comment := range config.TrailingComments {
+			if !strings.HasPrefix(strings.TrimSpace(comment), wireRoutePersistentProfileComment) {
+				comments = append(comments, comment)
+			}
+		}
+		config.TrailingComments = append(
+			comments,
+			wireRoutePersistentProfileComment+profileID)
+		if err := config.Save(true); err != nil {
+			return err
+		}
+		path, err := config.Path()
+		if err == nil {
+			err = InstallTunnel(path)
+		}
+		if err == nil {
+			return nil
+		}
+		if previous != nil {
+			_ = previous.Save(true)
+		} else {
+			_ = conf.DeleteName(config.Name)
+		}
+		return err
+	})
+}
+
+func UninstallWireRoutePersistentTunnel(name, profileID string) error {
+	profileID, err := normalizeWireRouteProfileID(profileID)
+	if err != nil {
+		return err
+	}
+	if !conf.TunnelNameIsValid(name) {
+		return errors.New("tunnel name is not valid")
+	}
+	return elevate.DoAsSystem(func() error {
+		config, err := conf.LoadFromName(name)
+		if err != nil {
+			return err
+		}
+		if !wireRoutePersistentProfileMatches(config, profileID) {
+			return errors.New("the protected tunnel profile is not owned by this WireRoute profile")
+		}
+		if err := UninstallTunnel(name); err != nil {
+			return err
+		}
+		if err := conf.DeleteName(name); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	})
+}
+
+func normalizeWireRouteProfileID(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if len(value) != 32 {
+		return "", errors.New("WireRoute profile identifier is invalid")
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			if character < 'a' || character > 'f' {
+				return "", errors.New("WireRoute profile identifier is invalid")
+			}
+		}
+	}
+	return value, nil
+}
+
+func wireRoutePersistentProfileMatches(config *conf.Config, profileID string) bool {
+	marker := wireRoutePersistentProfileComment + profileID
+	for _, comment := range config.TrailingComments {
+		if strings.EqualFold(strings.TrimSpace(comment), marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func InstallEphemeralTunnel(configPath string) error {

@@ -70,9 +70,19 @@ public sealed partial class MainWindow
             appSettings = await settingsStore.LoadAsync(managerCancellation.Token);
             PopulateSettingsFields(appSettings);
             ApplyAppearanceSettings(appSettings);
+            await RecordActivityAsync(
+                WireRouteActivityKind.AppStarted,
+                null,
+                appSettings.PersistentTunnelService
+                    ? "WireRoute started with Persistent VPN enabled."
+                    : "WireRoute started in service-free mode.");
         }
         catch (Exception exception)
         {
+            await RecordActivityAsync(
+                WireRouteActivityKind.AppStarted,
+                null,
+                "WireRoute started in service-free mode because settings could not be loaded.");
             await ShowMessageAsync("Settings are unavailable", exception.Message);
         }
     }
@@ -85,6 +95,8 @@ public sealed partial class MainWindow
         SettingsDnsServersBox.Text = settings.DnsServers;
         SettingsSplitRoutesBox.Text = settings.SplitTunnelRoutes;
         SettingsKeepaliveBox.Value = settings.PersistentKeepalive;
+        SettingsPersistentServiceToggle.IsOn = settings.PersistentTunnelService;
+        UpdatePersistentTunnelStatusText(settings.PersistentTunnelService);
     }
 
     private async void SettingsSaveButton_Click(object sender, RoutedEventArgs e)
@@ -112,18 +124,56 @@ public sealed partial class MainWindow
                 preferredEndpoint,
                 string.Join(", ", dnsServers),
                 string.Join(", ", splitRoutes),
-                keepalive);
+                keepalive,
+                SettingsPersistentServiceToggle.IsOn);
+            var persistenceChanged = settings.PersistentTunnelService
+                != appSettings.PersistentTunnelService;
+            if (persistenceChanged
+                && !await ConfirmPersistentTunnelModeChangeAsync(
+                    settings.PersistentTunnelService))
+            {
+                SettingsPersistentServiceToggle.IsOn = appSettings.PersistentTunnelService;
+                UpdatePersistentTunnelStatusText(appSettings.PersistentTunnelService);
+                return;
+            }
+
+            var previousSettings = appSettings;
             await settingsStore.SaveAsync(settings, managerCancellation.Token);
+            try
+            {
+                if (persistenceChanged)
+                {
+                    await ApplyPersistentTunnelModeAsync(
+                        settings.PersistentTunnelService,
+                        managerCancellation.Token);
+                }
+            }
+            catch
+            {
+                await settingsStore.SaveAsync(previousSettings, managerCancellation.Token);
+                appSettings = previousSettings;
+                PopulateSettingsFields(previousSettings);
+                throw;
+            }
             appSettings = settings;
             ApplyAppearanceSettings(settings);
+            UpdatePersistentTunnelStatusText(settings.PersistentTunnelService);
             await ShowMessageAsync(
                 "Settings saved",
-                "New RouterOS client profiles will use these defaults.");
+                persistenceChanged
+                    ? settings.PersistentTunnelService
+                        ? "Persistent VPN is enabled. Active tunnels were upgraded; future tunnels will remain connected across sign-out and restart."
+                        : "Service-free mode is enabled. WireRoute removed its persistent tunnel services; future tunnels run only for the current session."
+                    : "New RouterOS client profiles will use these defaults.");
         }
         catch (Exception exception) when (
             exception is ArgumentException
             or RoutePrefixValidationException
-            or WireRouteStorageException)
+            or WireRouteStorageException
+            or InvalidOperationException
+            or IOException
+            or OperationCanceledException
+            or System.ComponentModel.Win32Exception)
         {
             await ShowMessageAsync("Settings could not be saved", exception.Message);
         }

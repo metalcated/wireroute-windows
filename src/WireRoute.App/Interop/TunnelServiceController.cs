@@ -22,12 +22,14 @@ internal sealed class TunnelServiceController : IAsyncDisposable
 {
     private const long MaximumRuntimeLogBytes = 2 * 1024 * 1024;
     private const uint ScManagerConnect = 0x0001;
+    private const uint ServiceQueryConfig = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;
     private const int ScStatusProcessInfo = 0;
     private const uint ServiceStopped = 0x00000001;
     private const uint ServiceStartPending = 0x00000002;
     private const uint ServiceStopPending = 0x00000003;
     private const uint ServiceRunning = 0x00000004;
+    private const uint ServiceAutoStart = 0x00000002;
     private const int ErrorServiceDoesNotExist = 1060;
 
     private readonly string backendPath = Path.Combine(AppContext.BaseDirectory, "wireguard.exe");
@@ -90,8 +92,58 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         }
     }
 
+    public bool IsPersistentService(string profileName)
+    {
+        var manager = OpenSCManager(null, null, ScManagerConnect);
+        if (manager == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            var service = OpenService(manager, ServiceName(profileName), ServiceQueryConfig);
+            if (service == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            try
+            {
+                const int bufferSize = 8192;
+                var buffer = Marshal.AllocHGlobal(bufferSize);
+                try
+                {
+                    return QueryServiceConfig(service, buffer, bufferSize, out _)
+                        && unchecked((uint)Marshal.ReadInt32(buffer, sizeof(uint))) == ServiceAutoStart;
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+            finally
+            {
+                _ = CloseServiceHandle(service);
+            }
+        }
+        finally
+        {
+            _ = CloseServiceHandle(manager);
+        }
+    }
+
     public async Task StartAsync(
         WireRouteStoredProfile profile,
+        CancellationToken cancellationToken = default)
+        => await StartAsync(
+            profile,
+            persistent: false,
+            cancellationToken: cancellationToken);
+
+    public async Task StartAsync(
+        WireRouteStoredProfile profile,
+        bool persistent,
         CancellationToken cancellationToken = default)
     {
         if (!IsAvailable)
@@ -99,6 +151,12 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             throw new FileNotFoundException(
                 "The native WireRoute tunnel backend is not installed beside the app.",
                 backendPath);
+        }
+
+        if (persistent && profile.DnsProtectionMode == StoredDnsProtectionMode.Encrypted)
+        {
+            throw new InvalidOperationException(
+                "Persistent tunnels require Profile DNS because the encrypted DNS proxy runs inside the WireRoute tray app.");
         }
 
         var runtimeConfiguration = await PrepareRuntimeConfigurationAsync(
@@ -129,9 +187,12 @@ internal sealed class TunnelServiceController : IAsyncDisposable
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken);
             await RunElevatedAsync(
-                "/installephemeraltunnelservice",
+                persistent
+                    ? "/installwireroutepersistenttunnelservice"
+                    : "/installephemeraltunnelservice",
                 configurationPath,
-                cancellationToken);
+                cancellationToken,
+                persistent ? profile.Id.ToString("N") : null);
         }
         catch
         {
@@ -153,10 +214,14 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         WireRouteStoredProfile profile,
         CancellationToken cancellationToken = default)
     {
+        var persistent = IsPersistentService(profile.TunnelName);
         await RunElevatedAsync(
-            "/stopephemeraltunnelservice",
+            persistent
+                ? "/uninstallwireroutepersistenttunnelservice"
+                : "/stopephemeraltunnelservice",
             profile.TunnelName,
-            cancellationToken);
+            cancellationToken,
+            persistent ? profile.Id.ToString("N") : null);
         await dnsProxy.StopAsync(profile.TunnelName);
         var operationDirectory = RuntimeDirectory(profile);
         TryDelete(Path.Combine(operationDirectory, "tunnel.metrics"));
@@ -333,7 +398,8 @@ internal sealed class TunnelServiceController : IAsyncDisposable
     private async Task RunElevatedAsync(
         string command,
         string argument,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? secondArgument = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -345,6 +411,10 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         };
         startInfo.ArgumentList.Add(command);
         startInfo.ArgumentList.Add(argument);
+        if (!string.IsNullOrWhiteSpace(secondArgument))
+        {
+            startInfo.ArgumentList.Add(secondArgument);
+        }
 
         try
         {
@@ -353,8 +423,10 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             await process.WaitForExitAsync(cancellationToken);
             if (process.ExitCode != 0)
             {
+                var isRemoval = command.Contains("stop", StringComparison.Ordinal)
+                    || command.Contains("uninstall", StringComparison.Ordinal);
                 throw new InvalidOperationException(
-                    command.Contains("stop", StringComparison.Ordinal)
+                    isRemoval
                         ? "The tunnel could not be disconnected."
                         : "The tunnel could not be activated. Review the WireRoute log for details.");
             }
@@ -409,6 +481,14 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         IntPtr serviceManager,
         string serviceName,
         uint desiredAccess);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryServiceConfig(
+        IntPtr service,
+        IntPtr serviceConfig,
+        int bufferSize,
+        out int bytesNeeded);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

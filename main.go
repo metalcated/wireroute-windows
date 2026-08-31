@@ -71,8 +71,10 @@ func usage() {
 		"/installmanagerservice",
 		"/installtunnelservice CONFIG_PATH",
 		"/installephemeraltunnelservice CONFIG_PATH",
+		"/installwireroutepersistenttunnelservice CONFIG_PATH PROFILE_ID",
 		"/uninstallmanagerservice",
 		"/uninstalltunnelservice TUNNEL_NAME",
+		"/uninstallwireroutepersistenttunnelservice TUNNEL_NAME PROFILE_ID",
 		"/stopephemeraltunnelservice TUNNEL_NAME",
 		"/managerservice",
 		"/tunnelservice CONFIG_PATH [METRICS_PATH]",
@@ -265,6 +267,15 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	case "/installwireroutepersistenttunnelservice":
+		if len(os.Args) != 4 {
+			usage()
+		}
+		if err := manager.InstallWireRoutePersistentTunnel(os.Args[2], os.Args[3]); err != nil {
+			log.Printf("Unable to install persistent WireRoute tunnel: %v", err)
+			os.Exit(1)
+		}
+		return
 	case "/uninstalltunnelservice":
 		if len(os.Args) != 3 {
 			usage()
@@ -280,6 +291,15 @@ func main() {
 		}
 		if err := manager.UninstallTunnel(os.Args[2]); err != nil {
 			log.Printf("Unable to stop ephemeral tunnel: %v", err)
+			os.Exit(1)
+		}
+		return
+	case "/uninstallwireroutepersistenttunnelservice":
+		if len(os.Args) != 4 {
+			usage()
+		}
+		if err := manager.UninstallWireRoutePersistentTunnel(os.Args[2], os.Args[3]); err != nil {
+			log.Printf("Unable to uninstall persistent WireRoute tunnel: %v", err)
 			os.Exit(1)
 		}
 		return

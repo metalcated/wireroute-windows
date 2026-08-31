@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 using WireRoute.RouterOS;
 using WireRoute.Storage;
 
@@ -9,6 +10,26 @@ namespace WireRoute.Storage.Tests;
 [TestClass]
 public sealed class ProtectedRouterOSStorageTests
 {
+    [TestMethod]
+    public void LegacySettingsDefaultToServiceFreeMode()
+    {
+        const string json = """
+            {
+              "Theme": "Blue Nordic",
+              "TrayIconStyle": "Default",
+              "PreferredEndpoint": "",
+              "DnsServers": "",
+              "SplitTunnelRoutes": "",
+              "PersistentKeepalive": 25
+            }
+            """;
+
+        var settings = JsonSerializer.Deserialize<WireRouteAppSettings>(json);
+
+        Assert.IsNotNull(settings);
+        Assert.IsFalse(settings.PersistentTunnelService);
+    }
+
     [TestMethod]
     public async Task SettingsStoreRoundTripsPeerDefaults()
     {
@@ -22,7 +43,8 @@ public sealed class ProtectedRouterOSStorageTests
                 "vpn.example.com",
                 "192.0.2.53, 192.0.2.54",
                 "10.20.0.0/16",
-                30);
+                30,
+                true);
 
             await store.SaveAsync(settings);
 

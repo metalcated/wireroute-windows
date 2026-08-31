@@ -12,7 +12,7 @@ C:\Projects\wireguard-windows> build
 
 ### Running
 
-After publishing the WireRoute client, run `amd64\WireRoute.exe`. Closing the window keeps WireRoute in the notification area. Starting and stopping a tunnel requests elevation only for that operation; no persistent manager service is installed.
+After publishing the WireRoute client, run `amd64\WireRoute.exe`. Closing the window keeps WireRoute in the notification area. Starting and stopping a tunnel requests elevation only for that operation; no persistent manager service is installed. The optional Persistent VPN preference installs an automatic, WireRoute-marked per-tunnel service instead of the manager service and removes that service copy when the preference is disabled.
 
 ```text
 C:\Projects\wireroute-windows> amd64\WireRoute.exe

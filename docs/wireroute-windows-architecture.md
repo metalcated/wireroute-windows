@@ -11,7 +11,7 @@
 1. The existing Go tunnel engine and WireGuardNT integration remain authoritative. WireRoute does not reimplement adapter management, route application, or tunnel execution in C#.
 2. `WireRoute.exe` is an unprivileged, unpackaged WinUI 3 process with an `asInvoker` manifest. Releases target native x64 and ARM64 only.
 3. WireRoute does not install or require the automatic-start `WireGuardManager` service. Starting or stopping a tunnel produces a normal Windows elevation prompt.
-4. While connected, one manual-start per-tunnel service runs under Local System so WireGuardNT can apply routes and DNS. Disconnect stops and deletes that service; no inactive WireRoute service remains installed.
+4. Service-free mode uses one manual-start per-tunnel service under Local System while connected; disconnect stops and deletes it. Users may opt into Persistent VPN in Settings. That mode stores only WireRoute-marked configurations in the protected Local System configuration store and installs the active per-tunnel service with automatic startup so it can survive sign-out and restart. Disabling the option removes those marked service copies without deleting the user's protected local profiles.
 5. Profiles, RouterOS credentials, certificate pins, recovery configurations, settings, and activity history are protected per user with Windows DPAPI.
 6. Nordic Blue is the default appearance. The optional System appearance follows Windows light/dark changes. The notification icon is always present and supports the same WireRoute style choices as macOS.
 7. Closing the window hides it to the notification area. Quit is explicit.
@@ -27,6 +27,7 @@
 - The single-peer private-IP exclusion control uses the same non-private IPv4 route set and DNS-route updates as the released macOS editor.
 - Profile DNS is applied by the WireGuard tunnel service.
 - Encrypted DNS uses an in-process loopback proxy on `127.0.0.1:53`, forwards RFC 8484 messages over HTTPS/HTTP2 to the selected resolver, and makes no persistent system-wide DNS changes.
+- Persistent VPN requires Profile DNS because the in-process encrypted DNS proxy is intentionally unavailable outside the signed-in tray process.
 
 ## RouterOS boundary
 

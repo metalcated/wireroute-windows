@@ -691,6 +691,36 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="Persistent VPN" />
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="24">
+                        <Grid ColumnSpacing="24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="360" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="Keep connected across sign-out and restart" />
+                                <TextBlock
+                                    Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                    FontSize="12"
+                                    Text="Uses an automatic per-tunnel Windows service only while a profile is configured for persistence. The always-on WireGuard manager service is not installed."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                                <ToggleSwitch
+                                    x:Name="SettingsPersistentServiceToggle"
+                                    HorizontalAlignment="Stretch"
+                                    OffContent="Service-free"
+                                    OnContent="Persistent tunnel service" />
+                                <TextBlock
+                                    x:Name="SettingsPersistentServiceStatusText"
+                                    Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                    FontSize="11"
+                                    Text="The next tunnel you activate will use the selected mode."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                     <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="RouterOS Connections" />
                     <Border Style="{StaticResource NordicCardStyle}">
                         <StackPanel Spacing="12">
