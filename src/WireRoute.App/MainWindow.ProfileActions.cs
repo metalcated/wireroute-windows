@@ -3,8 +3,13 @@ using System.Net;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+using QRCoder;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 using WireRoute.App.Models;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
@@ -716,4 +721,195 @@ public sealed partial class MainWindow
         grid.Children.Add(labelText);
         grid.Children.Add(field);
     }
+
+    private void ProfilesList_RightTapped(
+        object sender,
+        RightTappedRoutedEventArgs e)
+    {
+        DependencyObject? current = e.OriginalSource as DependencyObject;
+        while (current is not null)
+        {
+            if (current is FrameworkElement element
+                && element.DataContext is ProfileNavigationItem item)
+            {
+                ProfilesList.SelectedItem = item;
+                if (ProfilesList.ContextFlyout is MenuFlyout flyout
+                    && flyout.Items.FirstOrDefault() is MenuFlyoutItem activate)
+                {
+                    activate.Text = item.IsActive ? "Deactivate" : "Activate";
+                }
+                return;
+            }
+            current = VisualTreeHelper.GetParent(current);
+        }
+    }
+
+    private async void ProfileContextActivate_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedProfile is not null)
+        {
+            await ToggleProfileAsync(selectedProfile);
+        }
+    }
+
+    private async void ProfileContextQr_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedProfile?.StoredProfile is null)
+        {
+            return;
+        }
+        var configuration = selectedProfile.StoredProfile.Configuration;
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(
+            configuration,
+            QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data);
+        var bytes = png.GetGraphic(8);
+        using var stream = new InMemoryRandomAccessStream();
+        using (var writer = new DataWriter(stream))
+        {
+            writer.WriteBytes(bytes);
+            await writer.StoreAsync();
+            await writer.FlushAsync();
+            writer.DetachStream();
+        }
+        stream.Seek(0);
+        var bitmap = new BitmapImage();
+        bitmap.SetSource(stream);
+        var image = new Image
+        {
+            Width = 360,
+            Height = 360,
+            Source = bitmap,
+            Stretch = Stretch.Uniform,
+        };
+        var content = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Spacing = 12,
+        };
+        content.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Microsoft.UI.Colors.White),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12),
+            Child = image,
+        });
+        content.Children.Add(SecondaryText(
+            "This QR code contains the client private key. Show it only to the device that will import this tunnel."));
+        var result = await ShowModalAsync(new ModalRequest
+        {
+            Title = selectedProfile.Name,
+            Subtitle = "Scan this WireGuard configuration QR code from the destination device.",
+            Content = content,
+            SecondaryText = "Copy Configuration",
+            CancelText = "Done",
+            MaxWidth = 620,
+        });
+        if (result == WireRouteModalResult.Secondary)
+        {
+            await CopySensitiveTextAsync(
+                configuration,
+                "Configuration copied",
+                "The sensitive WireGuard configuration is on the clipboard.");
+        }
+    }
+
+    private async void ProfileContextCopyPublicKey_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (selectedProfile?.Profile is null)
+        {
+            return;
+        }
+        var keyPair = WireGuardKeyPair.FromPrivateKey(
+            WireGuardConfigFormatter.PrivateKey(selectedProfile.Profile));
+        await CopySensitiveTextAsync(
+            keyPair.PublicKey,
+            "Public key copied",
+            "The client public key is on the clipboard.");
+    }
+
+    private async void ProfileContextCopyPrivateKey_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (selectedProfile?.Profile is null)
+        {
+            return;
+        }
+        await CopySensitiveTextAsync(
+            WireGuardConfigFormatter.PrivateKey(selectedProfile.Profile),
+            "Private key copied",
+            "The client private key is on the clipboard. Clear it after use.");
+    }
+
+    private async Task CopySensitiveTextAsync(
+        string value,
+        string title,
+        string message)
+    {
+        try
+        {
+            var package = new DataPackage();
+            package.SetText(value);
+            Clipboard.SetContent(package);
+            Clipboard.Flush();
+            await ShowMessageAsync(title, message);
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync("Clipboard is unavailable", exception.Message);
+        }
+    }
+
+    private async void ProfileContextExportSelected_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (selectedProfile?.StoredProfile is not { } profile)
+        {
+            return;
+        }
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedFileName = profile.Name,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            };
+            picker.FileTypeChoices.Add("Zip archive", new[] { ".zip" });
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+            var file = await picker.PickSaveFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+            await using var stream = await file.OpenStreamForWriteAsync();
+            stream.SetLength(0);
+            using var archive = new ZipArchive(
+                stream,
+                ZipArchiveMode.Create,
+                leaveOpen: true);
+            var entry = archive.CreateEntry(
+                profile.Name + ".conf",
+                CompressionLevel.Optimal);
+            await using var entryStream = entry.Open();
+            await using var writer = new StreamWriter(
+                entryStream,
+                new UTF8Encoding(false));
+            await writer.WriteAsync(profile.Configuration);
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync("Profile could not be exported", exception.Message);
+        }
+    }
+
+    private void ProfileContextRouterOS_Click(object sender, RoutedEventArgs e) =>
+        ShowDestination(Destination.RouterOS);
+
+    private void ProfileContextSettings_Click(object sender, RoutedEventArgs e) =>
+        ShowDestination(Destination.Settings);
 }

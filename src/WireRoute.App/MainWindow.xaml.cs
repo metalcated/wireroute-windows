@@ -12,6 +12,7 @@ using WireRoute.App.Models;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
+using WireRoute.RouterOS;
 using WireRoute.Storage;
 
 namespace WireRoute.App;
@@ -292,7 +293,8 @@ public sealed partial class MainWindow : Window
         ProfileNameText.Text = item.Name;
         SetProfileManagerControls(item);
         ProfileInterfaceNameText.Text = item.Name;
-        ProfilePublicKeyText.Text = "Calculated by WireGuardNT";
+        ProfilePublicKeyText.Text = WireGuardKeyPair.FromPrivateKey(
+            WireGuardConfigFormatter.PrivateKey(profile)).PublicKey;
         ProfilePeerPublicKeyText.Text = DisplayList(profile.Peers.Select(peer => peer.PublicKey));
         ProfileEndpointText.Text = DisplayList(
             profile.Peers

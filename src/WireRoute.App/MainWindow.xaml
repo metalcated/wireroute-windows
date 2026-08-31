@@ -62,8 +62,31 @@
                     Background="Transparent"
                     BorderThickness="0"
                     ItemsSource="{x:Bind Profiles}"
+                    RightTapped="ProfilesList_RightTapped"
                     SelectionChanged="ProfilesList_SelectionChanged"
                     SelectionMode="Single">
+                    <ListView.ContextFlyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Click="ProfileContextActivate_Click" Text="Activate" />
+                            <MenuFlyoutItem Click="ProfileEditButton_Click" Text="Edit…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="ProfileContextQr_Click" Text="Show Configuration QR Code…" />
+                            <MenuFlyoutItem Click="ProfileContextCopyPublicKey_Click" Text="Copy Public Key" />
+                            <MenuFlyoutItem Click="ProfileContextCopyPrivateKey_Click" Text="Copy Client Private Key…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="AddEmptyProfileMenuItem_Click" Text="Add Empty Tunnel…" />
+                            <MenuFlyoutItem Click="ImportProfileMenuItem_Click" Text="Import Tunnel(s) from File…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="ProfileContextExportSelected_Click" Text="Export Profile to Zip…" />
+                            <MenuFlyoutItem Click="ExportAllProfilesMenuItem_Click" Text="Export Tunnels to Zip…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="ViewLogMenuItem_Click" Text="View Log" />
+                            <MenuFlyoutItem Click="ProfileContextRouterOS_Click" Text="RouterOS Peer Manager…" />
+                            <MenuFlyoutItem Click="ProfileContextSettings_Click" Text="Settings…" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Click="DeleteSelectedProfileMenuItem_Click" Text="Delete Selected" />
+                        </MenuFlyout>
+                    </ListView.ContextFlyout>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:ProfileNavigationItem">
                             <Grid Padding="10,7">

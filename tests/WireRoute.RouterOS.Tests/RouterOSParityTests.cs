@@ -203,6 +203,17 @@ public sealed class RouterOSParityTests
     }
 
     [TestMethod]
+    public void PublicKeyCanBeDerivedFromStoredPrivateKey()
+    {
+        var generated = WireGuardKeyPair.Generate();
+
+        var derived = WireGuardKeyPair.FromPrivateKey(generated.PrivateKey);
+
+        Assert.AreEqual(generated.PublicKey, derived.PublicKey);
+        Assert.AreEqual(generated.PrivateKey, derived.PrivateKey);
+    }
+
+    [TestMethod]
     public void GeneratedClientConfigurationMatchesMacOsAndParsesAsWireGuard()
     {
         var configuration = new WireGuardClientConfiguration(

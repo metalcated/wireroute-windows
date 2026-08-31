@@ -384,6 +384,46 @@ public sealed record WireGuardKeyPair(string PublicKey, string PrivateKey)
             CryptographicOperations.ZeroMemory(privateKey);
         }
     }
+
+    public static WireGuardKeyPair FromPrivateKey(string privateKey)
+    {
+        byte[] privateBytes;
+        try
+        {
+            privateBytes = Convert.FromBase64String(privateKey);
+        }
+        catch (FormatException exception)
+        {
+            throw new CryptographicException("The WireGuard private key is not valid base64.", exception);
+        }
+        if (privateBytes.Length != 32)
+        {
+            CryptographicOperations.ZeroMemory(privateBytes);
+            throw new CryptographicException("A WireGuard private key must contain exactly 32 bytes.");
+        }
+
+        try
+        {
+            var parameters = new ECParameters
+            {
+                Curve = ECCurve.CreateFromFriendlyName("curve25519"),
+                D = privateBytes,
+            };
+            using var agreement = ECDiffieHellman.Create(parameters);
+            var exported = agreement.ExportParameters(includePrivateParameters: false);
+            if (exported.Q.X is not { Length: 32 } publicBytes)
+            {
+                throw new CryptographicException("Windows did not derive a valid X25519 public key.");
+            }
+            return new WireGuardKeyPair(
+                Convert.ToBase64String(publicBytes),
+                privateKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(privateBytes);
+        }
+    }
 }
 
 public sealed class WireGuardClientConfiguration
