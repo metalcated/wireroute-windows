@@ -19,7 +19,9 @@ public sealed partial class MainWindow
         }
 
         activeModal = request;
-        var completion = new TaskCompletionSource<WireRouteModalResult>();
+        var completion = new TaskCompletionSource<WireRouteModalResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var isFinished = false;
         var header = new StackPanel { Spacing = 6 };
         var titleRow = new Grid { ColumnSpacing = 14 };
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -138,11 +140,12 @@ public sealed partial class MainWindow
 
         void Finish(WireRouteModalResult result)
         {
-            if (!completion.TrySetResult(result))
+            if (isFinished)
             {
                 return;
             }
 
+            isFinished = true;
             ModalOverlay.Visibility = Visibility.Collapsed;
             ModalHeaderPresenter.Content = null;
             ModalContentPresenter.Content = null;
@@ -151,6 +154,7 @@ public sealed partial class MainWindow
             request.DetachButtons();
             activeModal = null;
             dismissActiveModal = null;
+            completion.TrySetResult(result);
         }
 
         async Task InvokeAsync(
