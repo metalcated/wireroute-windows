@@ -93,7 +93,7 @@
                                 </Grid.ColumnDefinitions>
                                 <Ellipse Width="7" Height="7" Fill="{StaticResource NordicTertiaryTextBrush}" />
                                 <StackPanel Grid.Column="1" Margin="10,0,8,0" Spacing="2">
-                                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock FontWeight="SemiBold" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock
                                         Foreground="{StaticResource NordicSecondaryTextBrush}"
                                         FontSize="11"
@@ -101,10 +101,15 @@
                                 </StackPanel>
                                 <Border
                                     Grid.Column="2"
-                                    Padding="7,3"
+                                    MinWidth="44"
+                                    Height="24"
+                                    Padding="8,0"
+                                    VerticalAlignment="Center"
                                     Background="{StaticResource NordicInsetBrush}"
                                     CornerRadius="5">
                                     <TextBlock
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
                                         Foreground="{StaticResource NordicSecondaryTextBrush}"
                                         FontSize="10"
                                         Text="{x:Bind RoutingLabel}" />

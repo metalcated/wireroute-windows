@@ -168,22 +168,17 @@ public sealed partial class MainWindow
         {
         }
 
-        var applyingConfigurationSyntax = false;
+        var lastColoredConfiguration = GetWireGuardConfigurationText(configurationBox);
         configurationBox.TextChanged += (_, _) =>
         {
-            if (!applyingConfigurationSyntax)
+            var configuration = GetWireGuardConfigurationText(configurationBox);
+            if (configuration.Equals(lastColoredConfiguration, StringComparison.Ordinal))
             {
-                applyingConfigurationSyntax = true;
-                try
-                {
-                    ApplyWireGuardSyntaxColors(configurationBox);
-                }
-                finally
-                {
-                    applyingConfigurationSyntax = false;
-                }
+                return;
             }
 
+            lastColoredConfiguration = configuration;
+            ApplyWireGuardSyntaxColors(configurationBox);
             UpdatePrivateRouteControl();
         };
         excludePrivateIpsBox.Click += (_, _) =>
