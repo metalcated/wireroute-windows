@@ -431,6 +431,7 @@ public sealed partial class MainWindow
             await managerClient.DisposeAsync();
         }
 
+        await localTunnelController.DisposeAsync();
         managerCancellation.Dispose();
     }
 }

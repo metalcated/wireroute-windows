@@ -143,7 +143,24 @@ public sealed partial class MainWindow : Window
                 try
                 {
                     var profile = WireGuardConfigParser.Parse(storedProfile.Configuration, storedProfile.Name);
-                    Profiles.Add(new ProfileNavigationItem(storedProfile, profile));
+                    var item = new ProfileNavigationItem(storedProfile, profile);
+                    item.UpdateState(localTunnelController.GetState(item.Name));
+                    Profiles.Add(item);
+                    if (item.IsActive
+                        && storedProfile.DnsProtectionMode == StoredDnsProtectionMode.Encrypted)
+                    {
+                        try
+                        {
+                            await localTunnelController.RestoreEncryptedDnsAsync(storedProfile);
+                        }
+                        catch (Exception exception)
+                        {
+                            await RecordActivityAsync(
+                                WireRouteActivityKind.TunnelError,
+                                item,
+                                "Encrypted DNS could not be restored: " + exception.Message);
+                        }
+                    }
                 }
                 catch (WireGuardConfigParseException)
                 {
@@ -621,6 +638,19 @@ public sealed partial class MainWindow : Window
 
     private async Task QuitWireRouteAsync()
     {
+        var encryptedDnsTunnel = Profiles.FirstOrDefault(profile =>
+            profile.IsActive
+            && profile.StoredProfile?.DnsProtectionMode == StoredDnsProtectionMode.Encrypted);
+        if (encryptedDnsTunnel is not null)
+        {
+            RestoreWindowFromTray();
+            await ShowMessageAsync(
+                "Disconnect before quitting",
+                "“" + encryptedDnsTunnel.Name + "” uses WireRoute's service-free encrypted DNS proxy. "
+                + "Deactivate this tunnel before quitting so DNS remains available.");
+            return;
+        }
+
         if (Profiles.Any(profile => profile.IsActive))
         {
             RestoreWindowFromTray();

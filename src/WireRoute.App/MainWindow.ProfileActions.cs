@@ -32,6 +32,18 @@ public sealed partial class MainWindow
             ["Google Public DNS"] = "https://dns.google/dns-query",
             ["Custom"] = string.Empty,
         };
+    private static readonly IReadOnlyDictionary<string, string[]> EncryptedDnsBootstrap =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["Cloudflare"] = ["1.1.1.1", "1.0.0.1"],
+            ["Cloudflare Security"] = ["1.1.1.2", "1.0.0.2"],
+            ["Cloudflare Family"] = ["1.1.1.3", "1.0.0.3"],
+            ["AdGuard DNS"] = ["94.140.14.14", "94.140.15.15"],
+            ["AdGuard Family"] = ["94.140.14.15", "94.140.15.16"],
+            ["Quad9 Secure"] = ["9.9.9.9", "149.112.112.112"],
+            ["Google Public DNS"] = ["8.8.8.8", "8.8.4.4"],
+            ["Custom"] = [],
+        };
 
     private async void AddEmptyProfileMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -407,7 +419,11 @@ public sealed partial class MainWindow
         var bootstrapBox = new TextBox
         {
             PlaceholderText = "Optional IPv4 or IPv6 addresses",
-            Text = string.Join(", ", stored.DnsBootstrapAddresses),
+            Text = stored.DnsBootstrapAddresses.Count > 0
+                ? string.Join(", ", stored.DnsBootstrapAddresses)
+                : string.Join(
+                    ", ",
+                    EncryptedDnsBootstrap[(string)providerBox.SelectedItem]),
         };
         var profilePanel = new StackPanel { Spacing = 10 };
         profilePanel.Children.Add(SectionLabel("Configured DNS servers"));
@@ -422,7 +438,8 @@ public sealed partial class MainWindow
         encryptedPanel.Children.Add(SectionLabel("Bootstrap addresses"));
         encryptedPanel.Children.Add(bootstrapBox);
         encryptedPanel.Children.Add(SecondaryText(
-            "Optional resolver IP addresses used when the resolver hostname cannot be reached without DNS."));
+            "WireRoute listens only on 127.0.0.1 while this tunnel is active and sends DNS queries "
+            + "to this HTTPS resolver. Bootstrap addresses avoid a plaintext hostname lookup."));
         var errorText = ModalErrorText();
         var body = new StackPanel { Spacing = 16 };
         body.Children.Add(SectionLabel("Protection mode"));
@@ -451,6 +468,7 @@ public sealed partial class MainWindow
                 && !provider.Equals("Custom", StringComparison.Ordinal))
             {
                 resolverBox.Text = EncryptedDnsProviders[provider];
+                bootstrapBox.Text = string.Join(", ", EncryptedDnsBootstrap[provider]);
             }
         };
         UpdateMode();
@@ -459,7 +477,8 @@ public sealed partial class MainWindow
         request = new ModalRequest
         {
             Title = "DNS Protection",
-            Subtitle = "Choose how this profile resolves domain names while connected. Encrypted DNS sends queries to the resolver you select.",
+            Subtitle = "Choose how this profile resolves domain names while connected. "
+                + "Encrypted DNS uses WireRoute's service-free loopback proxy and does not change system-wide DNS settings.",
             IconGlyph = "\uEA18",
             Content = ModalCard(body),
             PrimaryText = "Save",

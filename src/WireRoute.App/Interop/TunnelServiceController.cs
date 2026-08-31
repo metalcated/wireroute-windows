@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using WireRoute.Core.Profiles;
 using WireRoute.Storage;
 
 namespace WireRoute.App.Interop;
@@ -15,7 +17,7 @@ internal enum LocalTunnelState
     Unavailable,
 }
 
-internal sealed class TunnelServiceController
+internal sealed class TunnelServiceController : IAsyncDisposable
 {
     private const uint ScManagerConnect = 0x0001;
     private const uint ServiceQueryStatus = 0x0004;
@@ -31,6 +33,7 @@ internal sealed class TunnelServiceController
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "WireRoute",
         "Runtime");
+    private readonly DnsOverHttpsProxy dnsProxy = new();
 
     public bool IsAvailable => File.Exists(backendPath);
 
@@ -96,6 +99,9 @@ internal sealed class TunnelServiceController
                 backendPath);
         }
 
+        var runtimeConfiguration = await PrepareRuntimeConfigurationAsync(
+            profile,
+            cancellationToken);
         var operationDirectory = Path.Combine(runtimeRoot, Guid.NewGuid().ToString("N"));
         var configurationPath = Path.Combine(operationDirectory, profile.Name + ".conf");
         Directory.CreateDirectory(operationDirectory);
@@ -103,13 +109,21 @@ internal sealed class TunnelServiceController
         {
             await File.WriteAllTextAsync(
                 configurationPath,
-                profile.Configuration,
+                runtimeConfiguration,
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken);
             await RunElevatedAsync(
                 "/installephemeraltunnelservice",
                 configurationPath,
                 cancellationToken);
+        }
+        catch
+        {
+            if (profile.DnsProtectionMode == StoredDnsProtectionMode.Encrypted)
+            {
+                await dnsProxy.StopAsync(profile.Name);
+            }
+            throw;
         }
         finally
         {
@@ -118,8 +132,82 @@ internal sealed class TunnelServiceController
         }
     }
 
-    public Task StopAsync(string profileName, CancellationToken cancellationToken = default) =>
-        RunElevatedAsync("/stopephemeraltunnelservice", profileName, cancellationToken);
+    public async Task StopAsync(
+        string profileName,
+        CancellationToken cancellationToken = default)
+    {
+        await RunElevatedAsync(
+            "/stopephemeraltunnelservice",
+            profileName,
+            cancellationToken);
+        await dnsProxy.StopAsync(profileName);
+    }
+
+    public bool HasActiveEncryptedDns(string profileName) =>
+        dnsProxy.IsRunningFor(profileName);
+
+    public async Task RestoreEncryptedDnsAsync(
+        WireRouteStoredProfile profile,
+        CancellationToken cancellationToken = default)
+    {
+        if (profile.DnsProtectionMode != StoredDnsProtectionMode.Encrypted
+            || GetState(profile.Name) != LocalTunnelState.Active)
+        {
+            return;
+        }
+        _ = await PrepareRuntimeConfigurationAsync(profile, cancellationToken);
+    }
+
+    private async Task<string> PrepareRuntimeConfigurationAsync(
+        WireRouteStoredProfile profile,
+        CancellationToken cancellationToken)
+    {
+        if (profile.DnsProtectionMode != StoredDnsProtectionMode.Encrypted)
+        {
+            return profile.Configuration;
+        }
+        if (!Uri.TryCreate(profile.DnsResolverUrl, UriKind.Absolute, out var resolver)
+            || resolver.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "This profile does not contain a valid HTTPS DNS resolver.");
+        }
+
+        var bootstrap = profile.DnsBootstrapAddresses
+            .Select(value => IPAddress.TryParse(value, out var address) ? address : null)
+            .Where(address => address is not null)
+            .Cast<IPAddress>()
+            .Distinct()
+            .Take(8)
+            .ToArray();
+        if (bootstrap.Length == 0)
+        {
+            bootstrap = (await Dns.GetHostAddressesAsync(
+                resolver.DnsSafeHost,
+                cancellationToken))
+                .Where(address =>
+                    address.AddressFamily is System.Net.Sockets.AddressFamily.InterNetwork
+                        or System.Net.Sockets.AddressFamily.InterNetworkV6)
+                .Distinct()
+                .Take(8)
+                .ToArray();
+        }
+        if (bootstrap.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "WireRoute could not resolve an address for the encrypted DNS resolver.");
+        }
+
+        await dnsProxy.StartAsync(
+            profile.Name,
+            resolver,
+            bootstrap,
+            cancellationToken);
+        var parsed = WireGuardConfigParser.Parse(profile.Configuration, profile.Name);
+        return WireGuardConfigFormatter.ToWgQuick(
+            parsed,
+            dnsServers: new[] { IPAddress.Loopback.ToString() });
+    }
 
     private async Task RunElevatedAsync(
         string command,
@@ -218,4 +306,6 @@ internal sealed class TunnelServiceController
         public uint ProcessId;
         public uint ServiceFlags;
     }
+
+    public ValueTask DisposeAsync() => dnsProxy.DisposeAsync();
 }
