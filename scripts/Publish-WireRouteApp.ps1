@@ -7,6 +7,9 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
 
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string] $Version = '1.0.0',
+
     [string] $Destination
 )
 
@@ -18,7 +21,8 @@ $projectPath = Join-Path $repositoryRoot 'src\WireRoute.App\WireRoute.App.csproj
 
 $runtimeIdentifier = if ($Platform -eq 'x64') { 'win-x64' } else { 'win-arm64' }
 $architectureDirectory = if ($Platform -eq 'x64') { 'amd64' } else { 'arm64' }
-$publishDirectory = Join-Path $repositoryRoot ".distfiles\WireRoute.App\$runtimeIdentifier"
+$publishDirectory = Join-Path $repositoryRoot (
+    ".distfiles\WireRoute.App\$runtimeIdentifier\" + [Guid]::NewGuid().ToString('N'))
 
 if ([string]::IsNullOrWhiteSpace($Destination)) {
     $Destination = Join-Path $repositoryRoot $architectureDirectory
@@ -32,8 +36,12 @@ New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 dotnet publish $projectPath `
     --configuration $Configuration `
     --runtime $runtimeIdentifier `
-    --self-contained false `
+    --self-contained true `
     --property:Platform=$Platform `
+    --property:Version=$Version `
+    --property:WindowsAppSDKSelfContained=true `
+    --property:DebugSymbols=false `
+    --property:DebugType=None `
     --output $publishDirectory
 
 if ($LASTEXITCODE -ne 0) {
@@ -45,6 +53,8 @@ $targetDirectoryOutput = dotnet msbuild $projectPath `
     --property:Configuration=$Configuration `
     --property:Platform=$Platform `
     --property:RuntimeIdentifier=$runtimeIdentifier `
+    --property:Version=$Version `
+    --property:WindowsAppSDKSelfContained=true `
     -getProperty:TargetDir
 
 if ($LASTEXITCODE -ne 0) {
