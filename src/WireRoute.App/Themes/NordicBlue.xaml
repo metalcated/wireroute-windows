@@ -13,6 +13,11 @@
     <Color x:Key="NordicPrimaryTextColor">#F3F7FC</Color>
     <Color x:Key="NordicSecondaryTextColor">#A9B8CA</Color>
     <Color x:Key="NordicTertiaryTextColor">#7F92A8</Color>
+    <Color x:Key="WireGuardSyntaxSectionColor">#7EDC75</Color>
+    <Color x:Key="WireGuardSyntaxDirectiveColor">#FF5CA8</Color>
+    <Color x:Key="WireGuardSyntaxKeyMaterialColor">#F29A55</Color>
+    <Color x:Key="WireGuardSyntaxValueColor">#58A6FF</Color>
+    <Color x:Key="WireGuardSyntaxNumberColor">#C6A0F6</Color>
 
     <SolidColorBrush x:Key="NordicCanvasBrush" Color="{StaticResource NordicCanvasColor}" />
     <SolidColorBrush x:Key="NordicSidebarBrush" Color="{StaticResource NordicSidebarColor}" />
@@ -24,6 +29,11 @@
     <SolidColorBrush x:Key="NordicPrimaryTextBrush" Color="{StaticResource NordicPrimaryTextColor}" />
     <SolidColorBrush x:Key="NordicSecondaryTextBrush" Color="{StaticResource NordicSecondaryTextColor}" />
     <SolidColorBrush x:Key="NordicTertiaryTextBrush" Color="{StaticResource NordicTertiaryTextColor}" />
+    <SolidColorBrush x:Key="WireGuardSyntaxSectionBrush" Color="{StaticResource WireGuardSyntaxSectionColor}" />
+    <SolidColorBrush x:Key="WireGuardSyntaxDirectiveBrush" Color="{StaticResource WireGuardSyntaxDirectiveColor}" />
+    <SolidColorBrush x:Key="WireGuardSyntaxKeyMaterialBrush" Color="{StaticResource WireGuardSyntaxKeyMaterialColor}" />
+    <SolidColorBrush x:Key="WireGuardSyntaxValueBrush" Color="{StaticResource WireGuardSyntaxValueColor}" />
+    <SolidColorBrush x:Key="WireGuardSyntaxNumberBrush" Color="{StaticResource WireGuardSyntaxNumberColor}" />
 
     <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="ButtonCornerRadius">6</CornerRadius>

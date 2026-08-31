@@ -98,15 +98,7 @@ public sealed partial class MainWindow
             Content = "Wi-Fi",
             IsChecked = item?.StoredProfile?.OnDemandWiFi == true,
         };
-        var configurationBox = new TextBox
-        {
-            AcceptsReturn = true,
-            FontFamily = new FontFamily("Cascadia Mono"),
-            FontSize = 12,
-            MinHeight = 260,
-            Text = initialConfiguration,
-            TextWrapping = TextWrapping.NoWrap,
-        };
+        var configurationBox = CreateWireGuardConfigurationEditor(initialConfiguration);
         var publicKeyText = new TextBlock
         {
             FontFamily = new FontFamily("Cascadia Mono"),
@@ -138,7 +130,9 @@ public sealed partial class MainWindow
 
             try
             {
-                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorTunnelName());
+                var parsed = WireGuardConfigParser.Parse(
+                    GetWireGuardConfigurationText(configurationBox),
+                    EditorTunnelName());
                 publicKeyText.Text = WireGuardKeyPair.FromPrivateKey(
                     WireGuardConfigFormatter.PrivateKey(parsed)).PublicKey;
                 var state = WireGuardPrivateRouteExclusion.Evaluate(parsed);
@@ -174,7 +168,24 @@ public sealed partial class MainWindow
         {
         }
 
-        configurationBox.TextChanged += (_, _) => UpdatePrivateRouteControl();
+        var applyingConfigurationSyntax = false;
+        configurationBox.TextChanged += (_, _) =>
+        {
+            if (!applyingConfigurationSyntax)
+            {
+                applyingConfigurationSyntax = true;
+                try
+                {
+                    ApplyWireGuardSyntaxColors(configurationBox);
+                }
+                finally
+                {
+                    applyingConfigurationSyntax = false;
+                }
+            }
+
+            UpdatePrivateRouteControl();
+        };
         excludePrivateIpsBox.Click += (_, _) =>
         {
             if (updatingPrivateRouteControl)
@@ -184,13 +195,17 @@ public sealed partial class MainWindow
 
             try
             {
-                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorTunnelName());
+                var parsed = WireGuardConfigParser.Parse(
+                    GetWireGuardConfigurationText(configurationBox),
+                    EditorTunnelName());
                 var enable = excludePrivateIpsBox.IsChecked == true;
                 updatingPrivateRouteControl = true;
-                configurationBox.Text = WireGuardPrivateRouteExclusion.SetEnabled(
-                    parsed,
-                    enable,
-                    dnsServersAddedToAllowedIps);
+                SetWireGuardConfigurationText(
+                    configurationBox,
+                    WireGuardPrivateRouteExclusion.SetEnabled(
+                        parsed,
+                        enable,
+                        dnsServersAddedToAllowedIps));
                 dnsServersAddedToAllowedIps = enable
                     ? parsed.Interface.DnsServers.ToArray()
                     : null;
@@ -250,7 +265,8 @@ public sealed partial class MainWindow
                 try
                 {
                     var name = nameBox.Text.Trim();
-                    var configuration = configurationBox.Text.Trim() + Environment.NewLine;
+                    var configuration = GetWireGuardConfigurationText(configurationBox).Trim()
+                        + Environment.NewLine;
                     var existing = item?.StoredProfile;
                     var tunnelName = existing?.TunnelName
                         ?? WireRouteStoredProfile.CreateTunnelName(name, editorProfileId);
