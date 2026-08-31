@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -160,6 +161,15 @@ func pipeFromHandleArgument(handleStr string) (*os.File, error) {
 	return os.NewFile(uintptr(handleInt), "pipe"), nil
 }
 
+func wireRouteUIAvailable() bool {
+	path, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(filepath.Dir(path), "WireRoute.App.exe"))
+	return err == nil && info.Mode().IsRegular()
+}
+
 func main() {
 	if windows.SetDllDirectory("") != nil || windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32) != nil {
 		panic("failed to restrict dll search path")
@@ -184,7 +194,10 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		go ui.WaitForRaiseUIThenQuit()
+		usingWireRouteUI := wireRouteUIAvailable()
+		if !usingWireRouteUI {
+			go ui.WaitForRaiseUIThenQuit()
+		}
 		err := manager.InstallManager()
 		if err != nil {
 			if err == manager.ErrManagerAlreadyRunning {
@@ -193,6 +206,9 @@ func main() {
 			fatal(err)
 		}
 		checkForAdminDesktop()
+		if usingWireRouteUI {
+			return
+		}
 		time.Sleep(30 * time.Second)
 		fatalf("WireGuard system tray icon did not appear after 30 seconds.")
 		return

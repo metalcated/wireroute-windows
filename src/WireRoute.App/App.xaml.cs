@@ -65,7 +65,7 @@ public partial class App : Application
         var handle = new SafeFileHandle(new nint((long)value), ownsHandle: true);
         try
         {
-            return new FileStream(handle, access, bufferSize: 4096, isAsync: true);
+            return new FileStream(handle, access, bufferSize: 4096, isAsync: false);
         }
         catch
         {
