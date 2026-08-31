@@ -360,7 +360,7 @@ public sealed partial class MainWindow
             clientAddress,
             persistentKeepalive,
             existingPeers: routerOSPeers);
-        if (Profiles.Any(item => item.Name.Equals(peerCreation.Name, StringComparison.OrdinalIgnoreCase)))
+        if (Profiles.Any(item => WireRouteStoredProfile.DisplayNamesEqual(item.Name, peerCreation.Name)))
         {
             throw new ArgumentException($"A WireRoute profile named ‘{peerCreation.Name}’ already exists.");
         }

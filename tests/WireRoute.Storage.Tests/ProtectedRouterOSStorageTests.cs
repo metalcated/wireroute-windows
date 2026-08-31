@@ -133,6 +133,13 @@ public sealed class ProtectedRouterOSStorageTests
     }
 
     [TestMethod]
+    public void ProfileDisplayNameComparisonMatchesProtectedStoreUniqueness()
+    {
+        Assert.IsTrue(WireRouteStoredProfile.DisplayNamesEqual("Café", "CAFE"));
+        Assert.IsFalse(WireRouteStoredProfile.DisplayNamesEqual("Phone", "Laptop"));
+    }
+
+    [TestMethod]
     public async Task ActivityStoreProtectsAndFiltersProfileHistory()
     {
         var directory = NewStorageDirectory();

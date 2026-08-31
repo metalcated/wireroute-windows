@@ -289,7 +289,7 @@ public sealed partial class MainWindow : Window
         string configuration,
         ICollection<string> failures)
     {
-        if (Profiles.Any(item => item.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase)))
+        if (Profiles.Any(item => WireRouteStoredProfile.DisplayNamesEqual(item.Name, profileName)))
         {
             failures.Add($"{sourceName}: A profile with this name is already open.");
             return null;

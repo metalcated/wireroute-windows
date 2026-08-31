@@ -87,6 +87,12 @@ public sealed record WireRouteStoredProfile(
             ? candidate
             : "WireRoute-" + suffix;
     }
+
+    public static bool DisplayNamesEqual(string left, string right) =>
+        CultureInfo.CurrentCulture.CompareInfo.Compare(
+            left,
+            right,
+            CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) == 0;
 }
 
 [SupportedOSPlatform("windows")]
@@ -118,10 +124,7 @@ public sealed class WireGuardProfileStore
         {
             var duplicate = current.FirstOrDefault(value =>
                 value.Id != profile.Id
-                && CultureInfo.CurrentCulture.CompareInfo.Compare(
-                    value.Name,
-                    profile.Name,
-                    CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) == 0);
+                && WireRouteStoredProfile.DisplayNamesEqual(value.Name, profile.Name));
             if (duplicate is not null)
             {
                 throw new ArgumentException(
