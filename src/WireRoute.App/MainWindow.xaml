@@ -369,33 +369,149 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <Grid x:Name="RouterOSPanel" Visibility="Collapsed">
-                <StackPanel MaxWidth="720" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
-                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="32" Foreground="{StaticResource NordicAccentBrush}" Glyph="&#xE950;" />
-                    <TextBlock
-                        HorizontalAlignment="Center"
-                        FontFamily="Segoe UI Variable Display"
-                        FontSize="26"
-                        FontWeight="SemiBold"
-                        Text="RouterOS Peers" />
-                    <TextBlock
-                        HorizontalAlignment="Center"
-                        Foreground="{StaticResource NordicSecondaryTextBrush}"
-                        Text="Read-only discovery, certificate review, and guarded peer setup will appear here after the core tunnel path is validated."
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
+            <ScrollViewer x:Name="RouterOSPanel" Visibility="Collapsed">
+                <StackPanel MaxWidth="920" HorizontalAlignment="Center" Spacing="16">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="28" FontWeight="SemiBold" Text="RouterOS Peer Manager" />
+                            <TextBlock
+                                Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                Text="Discover WireGuard interfaces and peers before creating a client profile."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border
+                            Grid.Column="1"
+                            VerticalAlignment="Top"
+                            Background="#1F4C83F3"
+                            CornerRadius="6"
+                            Padding="14,5">
+                            <TextBlock Foreground="{StaticResource NordicAccentBrush}" FontSize="11" FontWeight="SemiBold" Text="GUARDED" />
+                        </Border>
+                    </Grid>
+
                     <Border Style="{StaticResource NordicCardStyle}">
-                        <StackPanel Spacing="7">
-                            <TextBlock Text="No RouterOS connection selected" />
+                        <StackPanel Spacing="12">
+                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="RouterOS connection" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox
+                                    x:Name="RouterOSConnectionPicker"
+                                    MinWidth="320"
+                                    DisplayMemberPath="Name"
+                                    ItemsSource="{x:Bind RouterOSConnections}"
+                                    SelectionChanged="RouterOSConnectionPicker_SelectionChanged" />
+                                <Button
+                                    x:Name="RouterOSConnectButton"
+                                    Grid.Column="1"
+                                    Click="RouterOSConnectButton_Click"
+                                    Content="Connect"
+                                    Style="{StaticResource NordicAccentButtonStyle}" />
+                                <ProgressRing
+                                    x:Name="RouterOSProgressRing"
+                                    Grid.Column="2"
+                                    Width="20"
+                                    Height="20"
+                                    IsActive="False" />
+                                <Button
+                                    Grid.Column="3"
+                                    Click="RouterOSManageConnectionsButton_Click"
+                                    Content="Manage in Settings…" />
+                            </Grid>
                             <TextBlock
                                 Foreground="{StaticResource NordicSecondaryTextBrush}"
                                 FontSize="12"
-                                Text="RouterOS writes remain unavailable until an exact change is reviewed and confirmed."
+                                Text="Set up and manage connections in Settings. Then choose a router here and Connect."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+
+                    <TextBlock
+                        x:Name="RouterOSStatusText"
+                        Foreground="{StaticResource NordicSecondaryTextBrush}"
+                        Text="Discovery is read-only. Every RouterOS change requires a separate review and confirmation."
+                        TextWrapping="Wrap" />
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="RouterOSSummaryText" VerticalAlignment="Center" FontWeight="SemiBold" Text="Not connected" />
+                        <CheckBox
+                            x:Name="RouterOSShowAllPeersCheckBox"
+                            Grid.Column="1"
+                            IsEnabled="False"
+                            Checked="RouterOSShowAllPeersCheckBox_Changed"
+                            Content="Show all peers"
+                            Unchecked="RouterOSShowAllPeersCheckBox_Changed" />
+                        <Button
+                            x:Name="RouterOSSetUpPeerButton"
+                            Grid.Column="2"
+                            IsEnabled="False"
+                            Content="Set Up Peer…" />
+                    </Grid>
+
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="0">
+                        <Grid MinHeight="260">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Padding="16,10" Background="{StaticResource NordicInsetBrush}" ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.3*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" FontWeight="SemiBold" Text="NAME" />
+                                <TextBlock Grid.Column="1" Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" FontWeight="SemiBold" Text="INTERFACE" />
+                                <TextBlock Grid.Column="2" Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" FontWeight="SemiBold" Text="STATUS" />
+                            </Grid>
+                            <ListView
+                                x:Name="RouterOSDiscoveryList"
+                                Grid.Row="1"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsItemClickEnabled="False"
+                                ItemsSource="{x:Bind RouterOSDiscoveryRows}"
+                                SelectionMode="None">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="10,8" ColumnSpacing="14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.3*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <TextBlock
+                                x:Name="RouterOSDiscoveryEmptyText"
+                                Grid.Row="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="{StaticResource NordicTertiaryTextBrush}"
+                                Text="Connect to securely discover WireGuard peers."
+                                TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
-            </Grid>
+            </ScrollViewer>
 
             <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed">
                 <StackPanel MaxWidth="820" HorizontalAlignment="Center" Spacing="18">
@@ -444,7 +560,49 @@
                                 FontSize="12"
                                 Text="Saved connections and passwords will use protected Windows credential storage. Read-only interface loading never changes RouterOS."
                                 TextWrapping="Wrap" />
-                            <Button IsEnabled="False" HorizontalAlignment="Left" Content="Add connection" />
+                            <Border
+                                MinHeight="128"
+                                Background="{StaticResource NordicInsetBrush}"
+                                BorderBrush="{StaticResource NordicBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <Grid>
+                                    <ListView
+                                        x:Name="RouterOSConnectionsList"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        ItemsSource="{x:Bind RouterOSConnections}"
+                                        SelectionChanged="RouterOSConnectionsList_SelectionChanged"
+                                        SelectionMode="Single">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Padding="8,6" ColumnSpacing="14">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="1.1*" />
+                                                        <ColumnDefinition Width="1.5*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="1" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding DefaultInterface}" TextTrimming="CharacterEllipsis" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <TextBlock
+                                        x:Name="RouterOSConnectionsEmptyText"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Foreground="{StaticResource NordicTertiaryTextBrush}"
+                                        Text="No RouterOS connections yet. Add one to use RouterOS Peers."
+                                        TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Click="RouterOSAddConnectionButton_Click" Content="Add Connection…" />
+                                <Button x:Name="RouterOSEditConnectionButton" Click="RouterOSEditConnectionButton_Click" Content="Edit…" IsEnabled="False" />
+                                <Button x:Name="RouterOSRemoveConnectionButton" Click="RouterOSRemoveConnectionButton_Click" Content="Remove…" IsEnabled="False" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource NordicCardStyle}">

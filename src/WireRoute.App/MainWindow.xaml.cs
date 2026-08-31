@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
         appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureWindow();
         UpdateProfilesEmptyState();
+        _ = LoadRouterOSConnectionsAsync();
     }
 
     public ObservableCollection<ProfileNavigationItem> Profiles { get; } = [];
