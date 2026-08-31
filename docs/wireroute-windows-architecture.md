@@ -44,3 +44,5 @@
 6. Validate the same tunnel path in a native ARM64 VM without emulation.
 
 The versioned protocol contract and C# framed-stream client are defined in `docs/manager-protocol-v1.md`. No manager implementation or launch behavior has been changed yet.
+
+RouterOS behavior is ported from Apple commit `efaba13`; the audited flow and required Windows-only substitutions are recorded in `docs/macos-routeros-parity.md`. `WireRoute.RouterOS` owns the platform-neutral REST, TLS-pin, discovery, provisioning, local key-generation, and recovery rules. The WinUI app will own protected per-user connection settings, while the privileged manager remains the only component allowed to persist or activate tunnel configurations.

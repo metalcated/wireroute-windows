@@ -8,6 +8,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WireRoute.App", "src\WireRo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WireRoute.Core.Tests", "tests\WireRoute.Core.Tests\WireRoute.Core.Tests.csproj", "{C1F8D719-C9A2-4937-9CBE-F6331486AE2D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WireRoute.RouterOS", "src\WireRoute.RouterOS\WireRoute.RouterOS.csproj", "{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WireRoute.RouterOS.Tests", "tests\WireRoute.RouterOS.Tests\WireRoute.RouterOS.Tests.csproj", "{F59B0B63-2254-40C1-A112-F66E70ABED73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -40,6 +44,22 @@ Global
 		{C1F8D719-C9A2-4937-9CBE-F6331486AE2D}.Release|ARM64.Build.0 = Release|Any CPU
 		{C1F8D719-C9A2-4937-9CBE-F6331486AE2D}.Release|x64.ActiveCfg = Release|Any CPU
 		{C1F8D719-C9A2-4937-9CBE-F6331486AE2D}.Release|x64.Build.0 = Release|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Debug|x64.Build.0 = Debug|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Release|ARM64.Build.0 = Release|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Release|x64.ActiveCfg = Release|Any CPU
+		{58B4DBA4-D935-4B0D-9823-A1DDC5833A8D}.Release|x64.Build.0 = Release|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Debug|x64.Build.0 = Debug|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Release|ARM64.Build.0 = Release|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Release|x64.ActiveCfg = Release|Any CPU
+		{F59B0B63-2254-40C1-A112-F66E70ABED73}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
