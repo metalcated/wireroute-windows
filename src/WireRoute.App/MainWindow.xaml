@@ -132,15 +132,20 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock
-                Grid.Row="3"
-                Margin="10,12,10,6"
-                Foreground="{StaticResource NordicTertiaryTextBrush}"
-                FontSize="11"
-                FontWeight="SemiBold"
-                Text="MANAGE" />
+            <Border
+                Grid.Row="4"
+                Margin="8,14,8,0"
+                Padding="2,12,2,6"
+                BorderBrush="{StaticResource NordicBorderBrush}"
+                BorderThickness="0,1,0,0">
+                <TextBlock
+                    Foreground="{StaticResource NordicTertiaryTextBrush}"
+                    FontSize="11"
+                    FontWeight="SemiBold"
+                    Text="MANAGE" />
+            </Border>
 
-            <StackPanel Grid.Row="4" Spacing="3">
+            <StackPanel Grid.Row="5" Spacing="3">
                 <Button x:Name="RouterOSButton" Click="RouterOSButton_Click" Style="{StaticResource SidebarActionButtonStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -171,7 +176,7 @@
                 </Button>
             </StackPanel>
 
-            <Grid Grid.Row="5" Margin="0,12,0,0" ColumnSpacing="6">
+            <Grid Grid.Row="3" Margin="0,12,0,0" ColumnSpacing="6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -664,8 +669,25 @@
                                 BorderThickness="1"
                                 CornerRadius="6">
                                 <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Padding="8,7" Background="{StaticResource NordicRaisedBrush}" ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.1*" />
+                                            <ColumnDefinition Width="1.5*" />
+                                            <ColumnDefinition Width="0.8*" />
+                                            <ColumnDefinition Width="0.9*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold" Text="Name" />
+                                        <TextBlock Grid.Column="1" FontSize="11" FontWeight="SemiBold" Text="Router address" />
+                                        <TextBlock Grid.Column="2" FontSize="11" FontWeight="SemiBold" Text="Username" />
+                                        <TextBlock Grid.Column="3" FontSize="11" FontWeight="SemiBold" Text="Default interface" />
+                                    </Grid>
                                     <ListView
                                         x:Name="RouterOSConnectionsList"
+                                        Grid.Row="1"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         ItemsSource="{x:Bind RouterOSConnections}"
@@ -690,6 +712,7 @@
                                     </ListView>
                                     <TextBlock
                                         x:Name="RouterOSConnectionsEmptyText"
+                                        Grid.Row="1"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         Foreground="{StaticResource NordicTertiaryTextBrush}"

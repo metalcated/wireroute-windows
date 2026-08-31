@@ -115,10 +115,17 @@ public sealed partial class MainWindow
         ModalHeaderPresenter.Content = header;
         ModalContentPresenter.Content = request.Content;
         ModalFooterPresenter.Content = footer;
-        var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
-        var availableHeight = Root.ActualHeight > 0 ? Root.ActualHeight : 760;
-        ModalFrame.Width = Math.Min(request.MaxWidth, Math.Max(240, availableWidth - 48));
-        ModalFrame.MaxHeight = Math.Max(240, availableHeight - 48);
+        void UpdateModalSize()
+        {
+            var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
+            var availableHeight = Root.ActualHeight > 0 ? Root.ActualHeight : 760;
+            ModalFrame.Width = Math.Min(request.MaxWidth, Math.Max(200, availableWidth - 48));
+            ModalFrame.MaxHeight = Math.Max(200, availableHeight - 48);
+        }
+
+        SizeChangedEventHandler resizeHandler = (_, _) => UpdateModalSize();
+        Root.SizeChanged += resizeHandler;
+        UpdateModalSize();
         ModalOverlay.Visibility = Visibility.Visible;
 
         void Finish(WireRouteModalResult result)
@@ -132,6 +139,7 @@ public sealed partial class MainWindow
             ModalHeaderPresenter.Content = null;
             ModalContentPresenter.Content = null;
             ModalFooterPresenter.Content = null;
+            Root.SizeChanged -= resizeHandler;
             request.DetachButtons();
             activeModal = null;
             dismissActiveModal = null;
