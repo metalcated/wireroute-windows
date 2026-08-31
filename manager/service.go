@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -148,6 +149,31 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 		}
 		defer runToken.Close()
 		userToken = 0
+
+		wireRoutePath := filepath.Join(filepath.Dir(path), "WireRoute.App.exe")
+		wireRouteRunToken := runToken
+		closeWireRouteRunToken := false
+		useWireRoute := false
+		if info, statErr := os.Stat(wireRoutePath); statErr == nil && info.Mode().IsRegular() {
+			if runToken.IsElevated() {
+				limitedToken, linkedErr := runToken.GetLinkedToken()
+				if linkedErr == nil && !limitedToken.IsElevated() {
+					wireRouteRunToken = limitedToken
+					closeWireRouteRunToken = true
+					useWireRoute = true
+				} else {
+					if linkedErr == nil {
+						limitedToken.Close()
+					}
+					log.Printf("Unable to obtain a limited token for WireRoute UI: %v", linkedErr)
+				}
+			} else {
+				useWireRoute = true
+			}
+		}
+		if closeWireRouteRunToken {
+			defer wireRouteRunToken.Close()
+		}
 		first := true
 		for {
 			if stoppingManager {
@@ -188,36 +214,55 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 				log.Printf("Unable to create pipe: %v", err)
 				return
 			}
-			IPCServerListen(ourReader, ourWriter, ourEvents, elevatedToken)
-			theirLogMapping, err := ringlogger.Global.ExportInheritableMappingHandle()
-			if err != nil {
-				ourReader.Close()
-				theirWriter.Close()
-				theirReader.Close()
-				ourWriter.Close()
-				theirEvents.Close()
-				ourEvents.Close()
-				log.Printf("Unable to export inheritable mapping handle for logging: %v", err)
-				return
+			var theirLogMapping windows.Handle
+			if useWireRoute {
+				managerV1ServerListen(ourReader, ourWriter, ourEvents, elevatedToken)
+			} else {
+				IPCServerListen(ourReader, ourWriter, ourEvents, elevatedToken)
+				theirLogMapping, err = ringlogger.Global.ExportInheritableMappingHandle()
+				if err != nil {
+					ourReader.Close()
+					theirWriter.Close()
+					theirReader.Close()
+					ourWriter.Close()
+					theirEvents.Close()
+					ourEvents.Close()
+					log.Printf("Unable to export inheritable mapping handle for logging: %v", err)
+					return
+				}
 			}
 
 			log.Printf("Starting UI process for user ‘%s@%s’ for session %d", username, domain, session)
 			procsLock.Lock()
 			var proc *uiProcess
 			if alive := aliveSessions[session]; alive {
-				proc, err = launchUIProcess(path, []string{
-					path,
-					"/ui",
-					strconv.FormatUint(uint64(theirReader.Fd()), 10),
-					strconv.FormatUint(uint64(theirWriter.Fd()), 10),
-					strconv.FormatUint(uint64(theirEvents.Fd()), 10),
-					strconv.FormatUint(uint64(theirLogMapping), 10),
-				}, userProfileDirectory, []windows.Handle{
-					windows.Handle(theirReader.Fd()),
-					windows.Handle(theirWriter.Fd()),
-					windows.Handle(theirEvents.Fd()),
-					theirLogMapping,
-				}, runToken)
+				if useWireRoute {
+					proc, err = launchUIProcess(wireRoutePath, []string{
+						wireRoutePath,
+						"/manager-v1",
+						strconv.FormatUint(uint64(theirReader.Fd()), 10),
+						strconv.FormatUint(uint64(theirWriter.Fd()), 10),
+						strconv.FormatUint(uint64(theirEvents.Fd()), 10),
+					}, userProfileDirectory, []windows.Handle{
+						windows.Handle(theirReader.Fd()),
+						windows.Handle(theirWriter.Fd()),
+						windows.Handle(theirEvents.Fd()),
+					}, wireRouteRunToken)
+				} else {
+					proc, err = launchUIProcess(path, []string{
+						path,
+						"/ui",
+						strconv.FormatUint(uint64(theirReader.Fd()), 10),
+						strconv.FormatUint(uint64(theirWriter.Fd()), 10),
+						strconv.FormatUint(uint64(theirEvents.Fd()), 10),
+						strconv.FormatUint(uint64(theirLogMapping), 10),
+					}, userProfileDirectory, []windows.Handle{
+						windows.Handle(theirReader.Fd()),
+						windows.Handle(theirWriter.Fd()),
+						windows.Handle(theirEvents.Fd()),
+						theirLogMapping,
+					}, runToken)
+				}
 			} else {
 				err = errors.New("Session has logged out")
 			}
@@ -225,7 +270,9 @@ func (service *managerService) Execute(args []string, r <-chan svc.ChangeRequest
 			theirReader.Close()
 			theirWriter.Close()
 			theirEvents.Close()
-			windows.CloseHandle(theirLogMapping)
+			if theirLogMapping != 0 {
+				windows.CloseHandle(theirLogMapping)
+			}
 			if err != nil {
 				ourReader.Close()
 				ourWriter.Close()

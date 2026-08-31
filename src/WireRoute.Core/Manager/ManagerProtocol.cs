@@ -16,7 +16,10 @@ public static class ManagerMethods
     public const string Hello = "hello";
     public const string ListProfiles = "profiles.list";
     public const string GetProfile = "profiles.get";
+    public const string ImportProfile = "profiles.import";
     public const string GetTunnelState = "tunnel.state";
+    public const string StartTunnel = "tunnel.start";
+    public const string StopTunnel = "tunnel.stop";
 }
 
 public static class ManagerEvents
@@ -143,6 +146,7 @@ public sealed record ManagerListProfilesResponse(IReadOnlyList<ManagerProfileSum
 
 public sealed record ManagerProfileSummary(
     string Name,
+    string DisplayName,
     ManagerTunnelState State,
     TunnelRouteMode DetectedRouteMode);
 
@@ -152,8 +156,19 @@ public sealed record ManagerGetTunnelStateRequest(string Name);
 
 public sealed record ManagerGetTunnelStateResponse(string Name, ManagerTunnelState State);
 
+public sealed record ManagerImportProfileRequest(
+    string DisplayName,
+    string WgQuickConfiguration);
+
+public sealed record ManagerImportProfileResponse(ManagerProfileSummary Profile);
+
+public sealed record ManagerTunnelCommandRequest(string Name);
+
+public sealed record ManagerTunnelCommandResponse(string Name, ManagerTunnelState State);
+
 public sealed record ManagerProfileDetail(
     string Name,
+    string DisplayName,
     IReadOnlyList<string> InterfaceAddresses,
     IReadOnlyList<ManagerDnsServer> DnsServers,
     IReadOnlyList<string> DnsSearchDomains,

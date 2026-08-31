@@ -507,10 +507,12 @@ func errToString(err error) string {
 
 func IPCServerNotifyTunnelChange(name string, state TunnelState, err error) {
 	notifyAll(TunnelChangeNotificationType, false, name, state, trackedTunnelsGlobalState(), errToString(err))
+	managerV1NotifyTunnelChanged(name, state, err)
 }
 
 func IPCServerNotifyTunnelsChange() {
 	notifyAll(TunnelsChangeNotificationType, false)
+	managerV1NotifyProfilesChanged()
 }
 
 func IPCServerNotifyUpdateFound(state UpdateState) {
@@ -523,5 +525,6 @@ func IPCServerNotifyUpdateProgress(dp updater.DownloadProgress) {
 
 func IPCServerNotifyManagerStopping() {
 	notifyAll(ManagerStoppingNotificationType, false)
+	managerV1NotifyManagerStopping()
 	time.Sleep(time.Millisecond * 200)
 }

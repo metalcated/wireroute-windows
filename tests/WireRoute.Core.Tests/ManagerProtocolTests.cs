@@ -14,14 +14,37 @@ public sealed class ManagerProtocolTests
     {
         var response = ManagerResponse.Success(
             7,
-            new ManagerProfileSummary("office", ManagerTunnelState.Started, TunnelRouteMode.Full));
+            new ManagerProfileSummary("office", "Office VPN", ManagerTunnelState.Started, TunnelRouteMode.Full));
 
         var json = Encoding.UTF8.GetString(ManagerProtocolJson.Serialize(response));
 
         StringAssert.Contains(json, "\"requestId\":7");
         StringAssert.Contains(json, "\"state\":\"started\"");
         StringAssert.Contains(json, "\"detectedRouteMode\":\"full\"");
+        StringAssert.Contains(json, "\"displayName\":\"Office VPN\"");
         Assert.IsFalse(json.Contains("RequestId", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void ImportAndTunnelCommandsUseStableContracts()
+    {
+        var import = ManagerRequest.Create(
+            21,
+            ManagerMethods.ImportProfile,
+            new ManagerImportProfileRequest("Road Warrior", "[Interface]\nPrivateKey = redacted"));
+        var start = ManagerRequest.Create(
+            22,
+            ManagerMethods.StartTunnel,
+            new ManagerTunnelCommandRequest("Road-Warrior"));
+
+        var importJson = Encoding.UTF8.GetString(ManagerProtocolJson.Serialize(import));
+        var startJson = Encoding.UTF8.GetString(ManagerProtocolJson.Serialize(start));
+
+        StringAssert.Contains(importJson, "\"method\":\"profiles.import\"");
+        StringAssert.Contains(importJson, "\"displayName\":\"Road Warrior\"");
+        StringAssert.Contains(importJson, "\"wgQuickConfiguration\"");
+        StringAssert.Contains(startJson, "\"method\":\"tunnel.start\"");
+        StringAssert.Contains(startJson, "\"name\":\"Road-Warrior\"");
     }
 
     [TestMethod]
