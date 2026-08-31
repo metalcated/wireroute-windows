@@ -169,12 +169,22 @@ public sealed partial class MainWindow
     private async void ProfileConnectButton_Click(object sender, RoutedEventArgs e)
     {
         var item = selectedProfile;
-        if (item?.ManagerName is null || managerClient is null)
+        if (item is null)
         {
             return;
         }
 
         ProfileConnectButton.IsEnabled = false;
+        await ToggleManagerProfileAsync(item);
+    }
+
+    private async Task ToggleManagerProfileAsync(ProfileNavigationItem item)
+    {
+        if (item.ManagerName is null || managerClient is null)
+        {
+            return;
+        }
+
         try
         {
             var method = item.ManagerState == ManagerTunnelState.Started
@@ -188,8 +198,12 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
+            RestoreWindowFromTray();
             await ShowMessageAsync("Tunnel state could not be changed", exception.Message);
-            SetProfileManagerControls(item);
+            if (ReferenceEquals(selectedProfile, item))
+            {
+                SetProfileManagerControls(item);
+            }
         }
     }
 

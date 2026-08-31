@@ -20,6 +20,7 @@ public static class ManagerMethods
     public const string GetTunnelState = "tunnel.state";
     public const string StartTunnel = "tunnel.start";
     public const string StopTunnel = "tunnel.stop";
+    public const string QuitManager = "manager.quit";
 }
 
 public static class ManagerEvents
@@ -127,7 +128,8 @@ public sealed record ManagerCapabilities(
     bool CanReadTunnelState,
     bool CanImportProfiles,
     bool CanStartTunnels,
-    bool CanStopTunnels);
+    bool CanStopTunnels,
+    bool CanQuitManager = false);
 
 public sealed record ManagerEmpty;
 
@@ -165,6 +167,10 @@ public sealed record ManagerImportProfileResponse(ManagerProfileSummary Profile)
 public sealed record ManagerTunnelCommandRequest(string Name);
 
 public sealed record ManagerTunnelCommandResponse(string Name, ManagerTunnelState State);
+
+public sealed record ManagerQuitRequest(bool StopTunnels);
+
+public sealed record ManagerQuitResponse(bool AlreadyQuit);
 
 public sealed record ManagerProfileDetail(
     string Name,

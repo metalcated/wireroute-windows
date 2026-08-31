@@ -28,11 +28,25 @@ internal sealed class TrayIcon : IDisposable
     private const int LeftButtonUp = 0x0202;
     private const int LeftButtonDoubleClick = 0x0203;
     private const int RightButtonUp = 0x0205;
+    private const int ContextMenu = 0x007B;
     private const int NotifyIconSelect = 0x0400;
     private const int NotifyIconKeySelect = 0x0401;
+    private const uint MenuString = 0x00000000;
+    private const uint MenuGray = 0x00000001;
+    private const uint MenuChecked = 0x00000008;
+    private const uint MenuPopup = 0x00000010;
+    private const uint MenuSeparator = 0x00000800;
+    private const uint TrackRightButton = 0x0002;
+    private const uint TrackReturnCommand = 0x0100;
+    private const uint TrackNoNotify = 0x0080;
+    private const uint NullMessage = 0x0000;
+    private const uint FirstCommandId = 100;
+    private const int MaximumInlineTunnels = 10;
 
     private readonly nint windowHandle;
     private readonly Action activateWindow;
+    private readonly Func<TrayMenuSnapshot> createMenuSnapshot;
+    private readonly Action<TrayMenuAction> executeMenuAction;
     private readonly WindowProcedure windowProcedure;
     private readonly nint previousWindowProcedure;
     private readonly nint previousSmallIcon;
@@ -43,10 +57,17 @@ internal sealed class TrayIcon : IDisposable
     private bool isAdded;
     private bool isDisposed;
 
-    public TrayIcon(nint windowHandle, string iconPath, Action activateWindow)
+    public TrayIcon(
+        nint windowHandle,
+        string iconPath,
+        Action activateWindow,
+        Func<TrayMenuSnapshot> createMenuSnapshot,
+        Action<TrayMenuAction> executeMenuAction)
     {
         this.windowHandle = windowHandle;
         this.activateWindow = activateWindow;
+        this.createMenuSnapshot = createMenuSnapshot;
+        this.executeMenuAction = executeMenuAction;
         var iconWidth = GetSystemMetrics(SmallIconWidth);
         var iconHeight = GetSystemMetrics(SmallIconHeight);
         iconHandle = LoadImage(
@@ -155,9 +176,14 @@ internal sealed class TrayIcon : IDisposable
         if (message == CallbackMessage)
         {
             var notification = unchecked((int)((long)lParam & 0xffff));
+            if (notification is RightButtonUp or ContextMenu)
+            {
+                ShowContextMenu();
+                return 0;
+            }
+
             if (notification is LeftButtonUp
                 or LeftButtonDoubleClick
-                or RightButtonUp
                 or NotifyIconSelect
                 or NotifyIconKeySelect)
             {
@@ -168,6 +194,113 @@ internal sealed class TrayIcon : IDisposable
 
         return CallWindowProc(previousWindowProcedure, window, message, wParam, lParam);
     }
+
+    private void ShowContextMenu()
+    {
+        var snapshot = createMenuSnapshot();
+        var actions = new Dictionary<uint, TrayMenuAction>();
+        var menu = CreatePopupMenu();
+        if (menu == 0)
+        {
+            return;
+        }
+
+        nint tunnelsMenu = 0;
+        try
+        {
+            AppendMenu(menu, MenuString | MenuGray, 0, EscapeMenuText(snapshot.StatusText));
+            if (snapshot.Tunnels.Count > 0)
+            {
+                AppendMenu(menu, MenuSeparator, 0, null);
+                if (snapshot.Tunnels.Count > MaximumInlineTunnels)
+                {
+                    tunnelsMenu = CreatePopupMenu();
+                    if (tunnelsMenu != 0)
+                    {
+                        AppendTunnels(tunnelsMenu, snapshot.Tunnels, actions);
+                        AppendMenu(menu, MenuString | MenuPopup, unchecked((nuint)tunnelsMenu), "Tunnels");
+                    }
+                }
+                else
+                {
+                    AppendTunnels(menu, snapshot.Tunnels, actions);
+                }
+            }
+
+            AppendMenu(menu, MenuSeparator, 0, null);
+            AppendAction(menu, actions, "Manage Tunnels", new TrayMenuAction(TrayMenuActionKind.ManageTunnels));
+            AppendAction(menu, actions, "Import Tunnel(s) from File…", new TrayMenuAction(TrayMenuActionKind.ImportTunnels));
+            AppendAction(menu, actions, "RouterOS Peer Manager…", new TrayMenuAction(TrayMenuActionKind.RouterOSPeerManager));
+            AppendAction(menu, actions, "Settings…", new TrayMenuAction(TrayMenuActionKind.Settings));
+            AppendMenu(menu, MenuSeparator, 0, null);
+            AppendAction(menu, actions, "About WireRoute", new TrayMenuAction(TrayMenuActionKind.About));
+            AppendAction(menu, actions, "Quit WireRoute", new TrayMenuAction(TrayMenuActionKind.Quit));
+
+            if (!GetCursorPos(out var point))
+            {
+                return;
+            }
+
+            SetForegroundWindow(windowHandle);
+            var command = TrackPopupMenuEx(
+                menu,
+                TrackRightButton | TrackReturnCommand | TrackNoNotify,
+                point.X,
+                point.Y,
+                windowHandle,
+                0);
+            PostMessage(windowHandle, NullMessage, 0, 0);
+            if (command != 0 && actions.TryGetValue(command, out var action))
+            {
+                executeMenuAction(action);
+            }
+        }
+        finally
+        {
+            DestroyMenu(menu);
+        }
+    }
+
+    private static void AppendTunnels(
+        nint menu,
+        IReadOnlyList<TrayTunnelMenuItem> tunnels,
+        IDictionary<uint, TrayMenuAction> actions)
+    {
+        foreach (var tunnel in tunnels)
+        {
+            var flags = MenuString;
+            if (!tunnel.IsEnabled)
+            {
+                flags |= MenuGray;
+            }
+
+            if (tunnel.IsChecked)
+            {
+                flags |= MenuChecked;
+            }
+
+            AppendAction(
+                menu,
+                actions,
+                tunnel.DisplayName,
+                new TrayMenuAction(TrayMenuActionKind.ToggleTunnel, tunnel.ManagerName),
+                flags);
+        }
+    }
+
+    private static void AppendAction(
+        nint menu,
+        IDictionary<uint, TrayMenuAction> actions,
+        string title,
+        TrayMenuAction action,
+        uint flags = MenuString)
+    {
+        var commandId = FirstCommandId + (uint)actions.Count;
+        actions.Add(commandId, action);
+        AppendMenu(menu, flags, commandId, EscapeMenuText(title));
+    }
+
+    private static string EscapeMenuText(string text) => text.Replace("&", "&&", StringComparison.Ordinal);
 
     public void Dispose()
     {
@@ -229,6 +362,13 @@ internal sealed class TrayIcon : IDisposable
         public nint BalloonIconHandle;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate nint WindowProcedure(nint window, uint message, nint wParam, nint lParam);
 
@@ -268,4 +408,57 @@ internal sealed class TrayIcon : IDisposable
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(nint icon);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint CreatePopupMenu();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "AppendMenuW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AppendMenu(nint menu, uint flags, nuint item, string? newItem);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyMenu(nint menu);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(nint window);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint TrackPopupMenuEx(
+        nint menu,
+        uint flags,
+        int x,
+        int y,
+        nint window,
+        nint parameters);
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(nint window, uint message, nint wParam, nint lParam);
+}
+
+internal sealed record TrayMenuSnapshot(string StatusText, IReadOnlyList<TrayTunnelMenuItem> Tunnels);
+
+internal sealed record TrayTunnelMenuItem(
+    string ManagerName,
+    string DisplayName,
+    bool IsChecked,
+    bool IsEnabled);
+
+internal sealed record TrayMenuAction(TrayMenuActionKind Kind, string? ManagerName = null);
+
+internal enum TrayMenuActionKind
+{
+    ToggleTunnel,
+    ManageTunnels,
+    ImportTunnels,
+    RouterOSPeerManager,
+    Settings,
+    About,
+    Quit,
 }

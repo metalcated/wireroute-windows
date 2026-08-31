@@ -65,7 +65,8 @@ Responses echo the request ID and contain exactly one of `result` or `error`:
       "canReadTunnelState": true,
       "canImportProfiles": false,
       "canStartTunnels": false,
-      "canStopTunnels": false
+      "canStopTunnels": false,
+      "canQuitManager": false
     }
   }
 }
@@ -73,7 +74,7 @@ Responses echo the request ID and contain exactly one of `result` or `error`:
 
 Events have a strictly increasing sequence number for the lifetime of one connection. A duplicate or decreasing sequence terminates the client connection rather than applying stale state.
 
-## Read-only phase methods
+## Methods
 
 | Method | Request | Result |
 | --- | --- | --- |
@@ -81,8 +82,12 @@ Events have a strictly increasing sequence number for the lifetime of one connec
 | `profiles.list` | Empty object | Redacted profile summaries |
 | `profiles.get` | Profile name | Redacted interface, peer, route, and DNS detail |
 | `tunnel.state` | Profile name | Current tunnel state |
+| `profiles.import` | Display name and wg-quick configuration | Imported profile summary |
+| `tunnel.start` | Profile name | Updated tunnel state |
+| `tunnel.stop` | Profile name | Updated tunnel state |
+| `manager.quit` | Whether to stop tunnels | Whether the manager had already begun quitting |
 
-The initial server implementation must advertise import/start/stop capabilities as `false`. Mutation methods will be specified and enabled only after the read-only path is validated against the installed manager.
+The manager advertises each privileged capability according to the connected session's token. `manager.quit` intentionally leaves active tunnels running when `stopTunnels` is `false`.
 
 ## Events
 

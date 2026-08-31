@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private readonly ManagerProtocolClient? managerClient;
     private readonly string? managerLaunchError;
     private ProfileNavigationItem? selectedProfile;
+    private bool isExiting;
 
     public MainWindow(ManagerProtocolClient? managerClient = null, string? managerLaunchError = null)
     {
@@ -35,7 +36,12 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
         appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureWindow();
-        trayIcon = new TrayIcon(windowHandle, AppIconPath(), RestoreWindowFromTray);
+        trayIcon = new TrayIcon(
+            windowHandle,
+            AppIconPath(),
+            RestoreWindowFromTray,
+            CreateTrayMenuSnapshot,
+            ExecuteTrayMenuAction);
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadRouterOSConnectionsAsync();
@@ -70,6 +76,11 @@ public sealed partial class MainWindow : Window
 
     private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         args.Cancel = true;
         sender.Hide();
     }
@@ -86,6 +97,11 @@ public sealed partial class MainWindow : Window
     }
 
     private async void ImportProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ImportProfilesAsync();
+    }
+
+    private async Task ImportProfilesAsync()
     {
         ImportProfileButton.IsEnabled = false;
         try
@@ -306,6 +322,11 @@ public sealed partial class MainWindow : Window
 
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        await ShowAboutAsync();
+    }
+
+    private async Task ShowAboutAsync()
+    {
         var content = new StackPanel { Spacing = 8 };
         content.Children.Add(new TextBlock
         {
@@ -321,6 +342,122 @@ public sealed partial class MainWindow : Window
 
         var dialog = CreateDialog("About WireRoute", content);
         await dialog.ShowAsync();
+    }
+
+    private TrayMenuSnapshot CreateTrayMenuSnapshot()
+    {
+        var managedProfiles = Profiles.Where(profile => profile.IsManaged).ToArray();
+        var status = managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Starting)
+            ? "Status: Activating"
+            : managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Stopping)
+                ? "Status: Deactivating"
+                : managedProfiles.Any(profile => profile.ManagerState == ManagerTunnelState.Started)
+                    ? "Status: Active"
+                    : "Status: Inactive";
+        var tunnels = managedProfiles
+            .Select(profile => new TrayTunnelMenuItem(
+                profile.ManagerName!,
+                profile.Name,
+                profile.ManagerState is ManagerTunnelState.Starting or ManagerTunnelState.Started,
+                profile.ManagerState switch
+                {
+                    ManagerTunnelState.Started => managerCapabilities?.CanStopTunnels == true,
+                    ManagerTunnelState.Stopped => managerCapabilities?.CanStartTunnels == true,
+                    _ => false,
+                }))
+            .ToArray();
+        return new TrayMenuSnapshot(status, tunnels);
+    }
+
+    private async void ExecuteTrayMenuAction(TrayMenuAction action)
+    {
+        switch (action.Kind)
+        {
+            case TrayMenuActionKind.ToggleTunnel:
+                var profile = Profiles.FirstOrDefault(item =>
+                    item.ManagerName?.Equals(action.ManagerName, StringComparison.OrdinalIgnoreCase) == true);
+                if (profile is not null)
+                {
+                    await ToggleManagerProfileAsync(profile);
+                }
+
+                break;
+            case TrayMenuActionKind.ManageTunnels:
+                RestoreWindowFromTray();
+                break;
+            case TrayMenuActionKind.ImportTunnels:
+                RestoreWindowFromTray();
+                await ImportProfilesAsync();
+                break;
+            case TrayMenuActionKind.RouterOSPeerManager:
+                RestoreWindowFromTray();
+                ShowDestination(Destination.RouterOS);
+                break;
+            case TrayMenuActionKind.Settings:
+                RestoreWindowFromTray();
+                ShowDestination(Destination.Settings);
+                break;
+            case TrayMenuActionKind.About:
+                RestoreWindowFromTray();
+                await ShowAboutAsync();
+                break;
+            case TrayMenuActionKind.Quit:
+                await QuitWireRouteAsync();
+                break;
+        }
+    }
+
+    private async Task QuitWireRouteAsync()
+    {
+        if (Profiles.Any(profile => profile.ManagerState == ManagerTunnelState.Started))
+        {
+            RestoreWindowFromTray();
+            var confirmation = CreateDialog(
+                "Quit WireRoute?",
+                new TextBlock
+                {
+                    MaxWidth = 560,
+                    Text = "The active tunnel will remain connected after WireRoute quits.",
+                    TextWrapping = TextWrapping.Wrap,
+                });
+            confirmation.PrimaryButtonText = "Quit WireRoute";
+            confirmation.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
+            confirmation.CloseButtonText = "Cancel";
+            confirmation.CloseButtonStyle = null;
+            if (await confirmation.ShowAsync() != ContentDialogResult.Primary)
+            {
+                return;
+            }
+        }
+
+        if (managerClient is not null)
+        {
+            if (managerCapabilities?.CanQuitManager != true)
+            {
+                RestoreWindowFromTray();
+                await ShowMessageAsync(
+                    "WireRoute could not quit",
+                    "The installed tunnel manager does not support intentional quit yet.");
+                return;
+            }
+
+            try
+            {
+                _ = await managerClient.RequestAsync<ManagerQuitRequest, ManagerQuitResponse>(
+                    ManagerMethods.QuitManager,
+                    new ManagerQuitRequest(StopTunnels: false),
+                    managerCancellation.Token);
+            }
+            catch (Exception exception)
+            {
+                RestoreWindowFromTray();
+                await ShowMessageAsync("WireRoute could not quit", exception.Message);
+                return;
+            }
+        }
+
+        isExiting = true;
+        Close();
     }
 
     private enum Destination

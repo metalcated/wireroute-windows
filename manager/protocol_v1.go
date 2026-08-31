@@ -82,6 +82,7 @@ type managerV1Capabilities struct {
 	CanImportProfiles     bool `json:"canImportProfiles"`
 	CanStartTunnels       bool `json:"canStartTunnels"`
 	CanStopTunnels        bool `json:"canStopTunnels"`
+	CanQuitManager        bool `json:"canQuitManager"`
 }
 
 type managerV1HelloResponse struct {
@@ -118,6 +119,14 @@ type managerV1ImportProfileRequest struct {
 
 type managerV1ImportProfileResponse struct {
 	Profile managerV1ProfileSummary `json:"profile"`
+}
+
+type managerV1QuitRequest struct {
+	StopTunnels bool `json:"stopTunnels"`
+}
+
+type managerV1QuitResponse struct {
+	AlreadyQuit bool `json:"alreadyQuit"`
 }
 
 type managerV1DNS struct {
@@ -243,7 +252,7 @@ func (s *managerV1Service) dispatch(method string, raw json.RawMessage) (any, er
 			managerV1Protocol,
 			managerV1Version,
 			version.Number,
-			managerV1Capabilities{true, true, true, canWrite, canWrite, canWrite},
+			managerV1Capabilities{true, true, true, canWrite, canWrite, canWrite, canWrite},
 		}, nil
 	case "profiles.list":
 		var request struct{}
@@ -299,6 +308,19 @@ func (s *managerV1Service) dispatch(method string, raw json.RawMessage) (any, er
 		}
 		state, _ := s.manager.State(request.Name)
 		return managerV1TunnelStateResponse{request.Name, managerV1State(state)}, nil
+	case "manager.quit":
+		var request managerV1QuitRequest
+		if err := decodeManagerV1Parameters(raw, &request); err != nil {
+			return nil, err
+		}
+		if s.manager.elevatedToken == 0 {
+			return nil, remoteManagerV1Error("accessDenied", "This session cannot quit the manager.")
+		}
+		alreadyQuit, err := s.manager.Quit(request.StopTunnels)
+		if err != nil {
+			return nil, err
+		}
+		return managerV1QuitResponse{alreadyQuit}, nil
 	default:
 		return nil, remoteManagerV1Error("methodNotFound", "The requested manager method is not available.")
 	}

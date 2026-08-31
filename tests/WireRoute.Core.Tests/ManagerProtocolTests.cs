@@ -48,6 +48,20 @@ public sealed class ManagerProtocolTests
     }
 
     [TestMethod]
+    public void QuitCommandKeepsTunnelsRunningByDefault()
+    {
+        var quit = ManagerRequest.Create(
+            23,
+            ManagerMethods.QuitManager,
+            new ManagerQuitRequest(StopTunnels: false));
+
+        var json = Encoding.UTF8.GetString(ManagerProtocolJson.Serialize(quit));
+
+        StringAssert.Contains(json, "\"method\":\"manager.quit\"");
+        StringAssert.Contains(json, "\"stopTunnels\":false");
+    }
+
+    [TestMethod]
     public async Task FrameCodecRoundTripsProtocolMessages()
     {
         await using var stream = new MemoryStream();

@@ -370,19 +370,59 @@ public sealed partial class MainWindow
                 ? "Required; protected with Windows DPAPI"
                 : "Leave blank to keep the saved password",
         };
-        var defaultInterfaceField = new TextBox
+        var interfaceChoices = new ObservableCollection<RouterOSInterfaceChoice>();
+        var automaticInterface = new RouterOSInterfaceChoice("Automatic", null);
+        interfaceChoices.Add(automaticInterface);
+        RouterOSInterfaceChoice initialInterface = automaticInterface;
+        if (!string.IsNullOrWhiteSpace(existing?.DefaultInterface))
+        {
+            initialInterface = new RouterOSInterfaceChoice(existing.DefaultInterface, existing.DefaultInterface);
+            interfaceChoices.Add(initialInterface);
+        }
+
+        var defaultInterfacePicker = new ComboBox
         {
             Header = "Default interface",
-            PlaceholderText = "Automatic",
-            Text = existing?.DefaultInterface ?? string.Empty,
+            ItemsSource = interfaceChoices,
+            SelectedItem = initialInterface,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        var errorText = new TextBlock
+        var loadInterfacesButton = new Button
         {
-            Foreground = new SolidColorBrush(Microsoft.UI.Colors.IndianRed),
+            Content = "Connect and Load Interfaces",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+        };
+        var loadInterfacesProgress = new ProgressRing
+        {
+            Width = 20,
+            Height = 20,
+            IsActive = false,
+            Visibility = Visibility.Collapsed,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var interfaceGrid = new Grid { ColumnSpacing = 12 };
+        interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(loadInterfacesButton, 1);
+        Grid.SetColumn(loadInterfacesProgress, 2);
+        interfaceGrid.Children.Add(defaultInterfacePicker);
+        interfaceGrid.Children.Add(loadInterfacesButton);
+        interfaceGrid.Children.Add(loadInterfacesProgress);
+
+        var statusText = new TextBlock
+        {
+            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
         };
-        var content = new StackPanel { MinWidth = 520, Spacing = 10 };
+        var certificateReview = new StackPanel
+        {
+            Spacing = 10,
+            Visibility = Visibility.Collapsed,
+        };
+        var content = new StackPanel { MinWidth = 640, MaxWidth = 720, Spacing = 10 };
         content.Children.Add(new TextBlock
         {
             Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
@@ -393,15 +433,16 @@ public sealed partial class MainWindow
         content.Children.Add(addressField);
         content.Children.Add(usernameField);
         content.Children.Add(passwordField);
-        content.Children.Add(defaultInterfaceField);
+        content.Children.Add(interfaceGrid);
         content.Children.Add(new TextBlock
         {
             Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
             FontSize = 12,
-            Text = "Optional. Enter the WireGuard interface to preselect when setting up a device.",
+            Text = "Connects read-only to list this router's WireGuard interfaces. No RouterOS settings are changed.",
             TextWrapping = TextWrapping.Wrap,
         });
-        content.Children.Add(errorText);
+        content.Children.Add(statusText);
+        content.Children.Add(certificateReview);
 
         var dialog = CreateDialog(
             existing is null ? "Add RouterOS Connection" : "Edit RouterOS Connection",
@@ -411,57 +452,237 @@ public sealed partial class MainWindow
         dialog.CloseButtonText = "Cancel";
         dialog.CloseButtonStyle = null;
         dialog.DefaultButton = ContentDialogButton.Primary;
+        dialog.MinWidth = 700;
+        dialog.MaxWidth = 780;
         RouterOSStoredConnection? saved = null;
+
+        RouterOSStoredConnection ReadConnectionFields()
+        {
+            var name = nameField.Text.Trim();
+            var address = addressField.Text.Trim();
+            var username = usernameField.Text.Trim();
+            var password = passwordField.Password.Length == 0
+                ? existing?.Password ?? string.Empty
+                : passwordField.Password;
+            if (name.Length == 0)
+            {
+                throw new ArgumentException("Enter a name for this connection.");
+            }
+
+            if (!Uri.TryCreate(address, UriKind.Absolute, out var url)
+                || url.Scheme != Uri.UriSchemeHttps
+                || string.IsNullOrWhiteSpace(url.Host))
+            {
+                throw new ArgumentException(
+                    "Enter a complete secure RouterOS address beginning with https://.");
+            }
+
+            if (username.Length == 0)
+            {
+                throw new ArgumentException("Enter the RouterOS username.");
+            }
+
+            if (password.Length == 0)
+            {
+                throw new ArgumentException("Enter the RouterOS password.");
+            }
+
+            var selectedInterface = defaultInterfacePicker.SelectedItem as RouterOSInterfaceChoice;
+            return new RouterOSStoredConnection(
+                existing?.Id ?? Guid.NewGuid(),
+                name,
+                url.AbsoluteUri,
+                username,
+                password,
+                selectedInterface?.InterfaceName);
+        }
+
+        void SetStatus(string message, bool isError = false, bool isSuccess = false)
+        {
+            statusText.Text = message;
+            statusText.Foreground = isError
+                ? new SolidColorBrush(Microsoft.UI.Colors.IndianRed)
+                : isSuccess
+                    ? new SolidColorBrush(Microsoft.UI.Colors.MediumSeaGreen)
+                    : (Brush)Application.Current.Resources["NordicSecondaryTextBrush"];
+            statusText.Visibility = Visibility.Visible;
+        }
+
+        var isReviewingCertificate = false;
+        void SetEditorBusy(bool busy)
+        {
+            var enableFields = !busy && !isReviewingCertificate;
+            nameField.IsEnabled = enableFields;
+            addressField.IsEnabled = enableFields;
+            usernameField.IsEnabled = enableFields;
+            passwordField.IsEnabled = enableFields;
+            defaultInterfacePicker.IsEnabled = enableFields;
+            loadInterfacesButton.IsEnabled = enableFields;
+            dialog.IsPrimaryButtonEnabled = enableFields;
+            loadInterfacesProgress.IsActive = busy;
+            loadInterfacesProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        void PopulateInterfaces(IReadOnlyList<RouterOSWireGuardInterface> interfaces)
+        {
+            var previous = (defaultInterfacePicker.SelectedItem as RouterOSInterfaceChoice)?.InterfaceName;
+            interfaceChoices.Clear();
+            interfaceChoices.Add(automaticInterface);
+            foreach (var item in interfaces)
+            {
+                interfaceChoices.Add(new RouterOSInterfaceChoice(
+                    item.IsDisabled ? $"{item.Name} — Disabled" : item.Name,
+                    item.Name));
+            }
+
+            var selected = previous is null
+                ? null
+                : interfaceChoices.FirstOrDefault(choice =>
+                    choice.InterfaceName?.Equals(previous, StringComparison.Ordinal) == true);
+            selected ??= interfaces
+                .Where(item => item.IsRunning && !item.IsDisabled)
+                .Select(item => interfaceChoices.First(choice => choice.InterfaceName == item.Name))
+                .FirstOrDefault();
+            selected ??= interfaces
+                .Where(item => !item.IsDisabled)
+                .Select(item => interfaceChoices.First(choice => choice.InterfaceName == item.Name))
+                .FirstOrDefault();
+            selected ??= interfaceChoices.Skip(1).FirstOrDefault();
+            defaultInterfacePicker.SelectedItem = selected ?? automaticInterface;
+        }
+
+        async Task LoadInterfacesAsync(bool allowCertificateReview)
+        {
+            RouterOSStoredConnection connection;
+            Uri url;
+            try
+            {
+                connection = ReadConnectionFields();
+                url = new Uri(connection.Url);
+            }
+            catch (Exception exception)
+            {
+                SetStatus(exception.Message, isError: true);
+                return;
+            }
+
+            SetEditorBusy(true);
+            SetStatus("Connecting securely and loading WireGuard interfaces…");
+            try
+            {
+                var trustedCertificate = await routerOSCertificateStore.LoadAsync(url);
+                using var transport = new RouterOSHttpTransport(url, trustedCertificate);
+                var client = new RouterOSClient(
+                    url,
+                    new RouterOSCredentials(connection.Username, connection.Password),
+                    transport);
+                var interfaces = await client.GetWireGuardInterfacesAsync();
+                PopulateInterfaces(interfaces);
+                SetStatus(
+                    interfaces.Count == 0
+                        ? "No WireGuard interfaces were found on this router."
+                        : interfaces.Count == 1
+                            ? "1 interface loaded."
+                            : $"{interfaces.Count} interfaces loaded.",
+                    isSuccess: interfaces.Count > 0);
+            }
+            catch (RouterOSTlsCertificateException exception) when (allowCertificateReview)
+            {
+                var certificate = exception.ReceivedCertificate;
+                var isReplacement = exception is RouterOSChangedCertificateException;
+                isReviewingCertificate = true;
+                certificateReview.Children.Clear();
+                certificateReview.Children.Add(new TextBlock
+                {
+                    FontSize = 18,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Text = isReplacement ? "Router Certificate Changed" : "Verify Router Certificate",
+                });
+                certificateReview.Children.Add(new TextBlock
+                {
+                    Text = isReplacement
+                        ? "The certificate no longer matches the one you trusted. Verify both fingerprints before replacing it."
+                        : "This router uses a certificate Windows does not recognize. Compare the SHA-256 fingerprint with the certificate on RouterOS before trusting it.",
+                    TextWrapping = TextWrapping.Wrap,
+                });
+                certificateReview.Children.Add(CertificateDetail("Router", $"{certificate.Host}:{certificate.Port}"));
+                certificateReview.Children.Add(CertificateDetail("Certificate", certificate.SubjectSummary ?? "Unnamed certificate"));
+                if (exception is RouterOSChangedCertificateException changed)
+                {
+                    certificateReview.Children.Add(CertificateDetail("Previously trusted", changed.ExpectedFingerprint));
+                }
+
+                certificateReview.Children.Add(CertificateDetail("Presented now", certificate.FingerprintSha256));
+                var trustButton = new Button
+                {
+                    Content = isReplacement ? "Replace Trust and Load" : "Trust and Load",
+                    Style = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
+                };
+                var cancelTrustButton = new Button { Content = "Cancel" };
+                var reviewButtons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                };
+                reviewButtons.Children.Add(trustButton);
+                reviewButtons.Children.Add(cancelTrustButton);
+                certificateReview.Children.Add(reviewButtons);
+                certificateReview.Visibility = Visibility.Visible;
+                SetStatus("Verify the router certificate before loading interfaces.");
+                trustButton.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        trustButton.IsEnabled = false;
+                        cancelTrustButton.IsEnabled = false;
+                        await routerOSCertificateStore.SaveAsync(certificate);
+                        isReviewingCertificate = false;
+                        certificateReview.Visibility = Visibility.Collapsed;
+                        SetEditorBusy(false);
+                        await LoadInterfacesAsync(allowCertificateReview: false);
+                    }
+                    catch (Exception storageException)
+                    {
+                        trustButton.IsEnabled = true;
+                        cancelTrustButton.IsEnabled = true;
+                        SetStatus(storageException.Message, isError: true);
+                    }
+                };
+                cancelTrustButton.Click += (_, _) =>
+                {
+                    isReviewingCertificate = false;
+                    certificateReview.Visibility = Visibility.Collapsed;
+                    SetEditorBusy(false);
+                    SetStatus("Connection cancelled. The router certificate was not trusted.");
+                };
+            }
+            catch (OperationCanceledException)
+            {
+                SetStatus("RouterOS connection cancelled.");
+            }
+            catch (Exception exception)
+            {
+                SetStatus(exception.Message, isError: true);
+            }
+            finally
+            {
+                SetEditorBusy(false);
+            }
+        }
+
+        loadInterfacesButton.Click += async (_, _) => await LoadInterfacesAsync(allowCertificateReview: true);
         dialog.PrimaryButtonClick += async (_, args) =>
         {
             var deferral = args.GetDeferral();
             try
             {
-                var name = nameField.Text.Trim();
-                var address = addressField.Text.Trim();
-                var username = usernameField.Text.Trim();
-                var password = passwordField.Password.Length == 0
-                    ? existing?.Password ?? string.Empty
-                    : passwordField.Password;
-                if (name.Length == 0)
-                {
-                    throw new ArgumentException("Enter a name for this connection.");
-                }
-
-                if (!Uri.TryCreate(address, UriKind.Absolute, out var url)
-                    || url.Scheme != Uri.UriSchemeHttps
-                    || string.IsNullOrWhiteSpace(url.Host))
-                {
-                    throw new ArgumentException(
-                        "Enter a complete secure RouterOS address beginning with https://.");
-                }
-
-                if (username.Length == 0)
-                {
-                    throw new ArgumentException("Enter the RouterOS username.");
-                }
-
-                if (password.Length == 0)
-                {
-                    throw new ArgumentException("Enter the RouterOS password.");
-                }
-
-                saved = new RouterOSStoredConnection(
-                    existing?.Id ?? Guid.NewGuid(),
-                    name,
-                    url.AbsoluteUri,
-                    username,
-                    password,
-                    string.IsNullOrWhiteSpace(defaultInterfaceField.Text)
-                        ? null
-                        : defaultInterfaceField.Text.Trim());
+                saved = ReadConnectionFields();
                 await routerOSConnectionStore.SaveAsync(saved);
             }
             catch (Exception exception)
             {
                 args.Cancel = true;
-                errorText.Text = exception.Message;
-                errorText.Visibility = Visibility.Visible;
+                SetStatus(exception.Message, isError: true);
             }
             finally
             {
@@ -474,6 +695,11 @@ public sealed partial class MainWindow
         {
             await LoadRouterOSConnectionsAsync(saved.Id);
         }
+    }
+
+    private sealed record RouterOSInterfaceChoice(string DisplayName, string? InterfaceName)
+    {
+        public override string ToString() => DisplayName;
     }
 
     private async void RouterOSRemoveConnectionButton_Click(object sender, RoutedEventArgs e)
