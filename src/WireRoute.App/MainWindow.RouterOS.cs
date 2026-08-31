@@ -350,9 +350,7 @@ public sealed partial class MainWindow
         var raisedBrush = (Brush)Application.Current.Resources["NordicRaisedBrush"];
         var borderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"];
         var secondaryTextBrush = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"];
-        var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
-        var contentWidth = Math.Min(860, Math.Max(360, availableWidth - 112));
-        var compactInterfaceRow = contentWidth < 620;
+        var compactInterfaceRow = Root.ActualWidth > 0 && Root.ActualWidth < 760;
 
         var nameField = new TextBox
         {
@@ -528,57 +526,12 @@ public sealed partial class MainWindow
             Padding = new Thickness(18),
             Child = formGrid,
         };
-        var cancelButton = new Button
-        {
-            Background = raisedBrush,
-            BorderBrush = borderBrush,
-            BorderThickness = new Thickness(1),
-            Content = "Cancel",
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(16, 8, 16, 8),
-        };
-        var saveButton = new Button
-        {
-            Content = "Save Connection",
-            Padding = new Thickness(16, 8, 16, 8),
-            Style = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
-        };
-        var buttonRow = new Grid { ColumnSpacing = 10 };
-        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(cancelButton, 1);
-        Grid.SetColumn(saveButton, 2);
-        buttonRow.Children.Add(cancelButton);
-        buttonRow.Children.Add(saveButton);
-
-        var content = new StackPanel { Width = contentWidth, Spacing = 12 };
-        content.Children.Add(new TextBlock
-        {
-            FontFamily = new FontFamily("Segoe UI Variable Display"),
-            FontSize = 28,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Text = existing is null ? "Add RouterOS Connection" : "Edit RouterOS Connection",
-        });
-        content.Children.Add(new TextBlock
-        {
-            Foreground = secondaryTextBrush,
-            Text = "Name this router and enter its REST connection details. WireRoute protects the password with current-user Windows DPAPI.",
-            TextWrapping = TextWrapping.Wrap,
-        });
+        var content = new StackPanel { Spacing = 12 };
         content.Children.Add(formCard);
         content.Children.Add(statusText);
         content.Children.Add(certificateReview);
-        content.Children.Add(buttonRow);
-
-        var dialog = CreateDialog(string.Empty, content);
-        dialog.Title = null;
-        dialog.CloseButtonText = string.Empty;
-        dialog.DefaultButton = ContentDialogButton.None;
-        var dialogWidth = Math.Min(availableWidth - 32, contentWidth + 48);
-        dialog.MinWidth = dialogWidth;
-        dialog.MaxWidth = dialogWidth;
         RouterOSStoredConnection? saved = null;
+        ModalRequest? modalRequest = null;
 
         RouterOSStoredConnection ReadConnectionFields()
         {
@@ -642,8 +595,8 @@ public sealed partial class MainWindow
             passwordField.IsEnabled = enableFields;
             defaultInterfacePicker.IsEnabled = enableFields;
             loadInterfacesButton.IsEnabled = enableFields;
-            saveButton.IsEnabled = enableFields;
-            cancelButton.IsEnabled = !busy;
+            modalRequest?.SetPrimaryEnabled(enableFields);
+            modalRequest?.SetCancelEnabled(!busy);
             loadInterfacesProgress.IsActive = busy;
             loadInterfacesProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -796,25 +749,31 @@ public sealed partial class MainWindow
         }
 
         loadInterfacesButton.Click += async (_, _) => await LoadInterfacesAsync(allowCertificateReview: true);
-        cancelButton.Click += (_, _) => dialog.Hide();
-        saveButton.Click += async (_, _) =>
+        modalRequest = new ModalRequest
         {
-            saveButton.IsEnabled = false;
-            try
+            Title = existing is null ? "Add RouterOS Connection" : "Edit RouterOS Connection",
+            Subtitle = "Name this router and enter its REST connection details. WireRoute protects the password with current-user Windows DPAPI.",
+            Content = content,
+            PrimaryText = "Save Connection",
+            MaxWidth = 920,
+            OnPrimary = async () =>
             {
-                saved = ReadConnectionFields();
-                await routerOSConnectionStore.SaveAsync(saved);
-                dialog.Hide();
-            }
-            catch (Exception exception)
-            {
-                saved = null;
-                saveButton.IsEnabled = true;
-                SetStatus(exception.Message, isError: true);
-            }
+                try
+                {
+                    saved = ReadConnectionFields();
+                    await routerOSConnectionStore.SaveAsync(saved);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    saved = null;
+                    SetStatus(exception.Message, isError: true);
+                    return false;
+                }
+            },
         };
 
-        _ = await dialog.ShowAsync();
+        _ = await ShowModalAsync(modalRequest);
         if (saved is not null)
         {
             await LoadRouterOSConnectionsAsync(saved.Id);

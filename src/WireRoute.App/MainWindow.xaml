@@ -629,5 +629,44 @@
                 </StackPanel>
             </ScrollViewer>
         </Grid>
+
+        <Grid
+            x:Name="ModalOverlay"
+            Grid.RowSpan="2"
+            Grid.ColumnSpan="2"
+            Canvas.ZIndex="1000"
+            Background="#B3000000"
+            KeyDown="ModalOverlay_KeyDown"
+            Visibility="Collapsed">
+            <Border
+                x:Name="ModalFrame"
+                Margin="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{StaticResource NordicCanvasBrush}"
+                BorderBrush="{StaticResource NordicBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="18"
+                Padding="28">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ContentPresenter x:Name="ModalHeaderPresenter" Margin="0,0,0,18" />
+                    <ScrollViewer
+                        x:Name="ModalContentScrollViewer"
+                        Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalScrollMode="Disabled"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Auto">
+                        <ContentPresenter x:Name="ModalContentPresenter" />
+                    </ScrollViewer>
+                    <ContentPresenter x:Name="ModalFooterPresenter" Grid.Row="2" Margin="0,18,0,0" />
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
