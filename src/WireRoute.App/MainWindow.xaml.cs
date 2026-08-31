@@ -39,7 +39,6 @@ public sealed partial class MainWindow : Window
         this.managerLaunchError = managerLaunchError;
         InitializeComponent();
         Root.ActualThemeChanged += Root_ActualThemeChanged;
-        Profiles.CollectionChanged += (_, _) => UpdateProfilesEmptyState();
 
         windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
@@ -51,6 +50,12 @@ public sealed partial class MainWindow : Window
             RestoreWindowFromTray,
             CreateTrayMenuSnapshot,
             ExecuteTrayMenuAction);
+        Profiles.CollectionChanged += (_, _) =>
+        {
+            UpdateProfilesEmptyState();
+            UpdateTrayIconAppearance();
+        };
+        UpdateTrayIconAppearance();
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadStoredProfilesAsync();

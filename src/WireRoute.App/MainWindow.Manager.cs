@@ -143,6 +143,7 @@ public sealed partial class MainWindow
             ProfilesList.SelectedItem = item;
             SetProfileManagerControls(item);
         }
+        UpdateTrayIconAppearance();
     }
 
     private void SetProfileManagerControls(ProfileNavigationItem item)
@@ -298,6 +299,7 @@ public sealed partial class MainWindow
         {
             ProfilesList.SelectedItem = item;
         }
+        UpdateTrayIconAppearance();
     }
 
     private async Task ToggleManagerProfileAsync(ProfileNavigationItem item)

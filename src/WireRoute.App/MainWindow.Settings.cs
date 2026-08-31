@@ -102,7 +102,13 @@ public sealed partial class MainWindow
         {
             ApplyBlueNordicPalette();
         }
+        UpdateTrayIconAppearance();
     }
+
+    private void UpdateTrayIconAppearance() => trayIcon.SetAppearance(
+        appSettings.TrayIconStyle,
+        Profiles.Any(profile => profile.IsActive),
+        Profiles.Any(profile => profile.IsTransitioning));
 
     private void ApplySystemPalette()
     {

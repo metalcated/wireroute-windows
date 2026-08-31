@@ -9,6 +9,7 @@ internal sealed class TrayIcon : IDisposable
     private const uint CallbackMessage = 0x8000 + 37;
     private const int WindowProcedureIndex = -4;
     private const uint NotifyIconAdd = 0x00000000;
+    private const uint NotifyIconModify = 0x00000001;
     private const uint NotifyIconDelete = 0x00000002;
     private const uint NotifyIconSetVersion = 0x00000004;
     private const uint NotifyIconVersion4 = 4;
@@ -51,11 +52,15 @@ internal sealed class TrayIcon : IDisposable
     private readonly nint previousWindowProcedure;
     private readonly nint previousSmallIcon;
     private readonly nint previousLargeIcon;
+    private readonly nint originalIconHandle;
     private readonly uint taskbarCreatedMessage;
     private nint iconHandle;
     private nint largeIconHandle;
     private bool isAdded;
     private bool isDisposed;
+    private string appearanceStyle = string.Empty;
+    private bool appearanceActive;
+    private bool appearanceTransitioning;
 
     public TrayIcon(
         nint windowHandle,
@@ -81,6 +86,7 @@ internal sealed class TrayIcon : IDisposable
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "WireRoute could not load its notification icon.");
         }
+        originalIconHandle = iconHandle;
 
         largeIconHandle = LoadImage(
             0,
@@ -155,6 +161,41 @@ internal sealed class TrayIcon : IDisposable
         IconHandle = iconHandle,
         Tip = "WireRoute",
     };
+
+    public void SetAppearance(string style, bool active, bool transitioning)
+    {
+        if (isDisposed
+            || appearanceStyle.Equals(style, StringComparison.OrdinalIgnoreCase)
+            && appearanceActive == active
+            && appearanceTransitioning == transitioning)
+        {
+            return;
+        }
+
+        var size = Math.Max(
+            GetSystemMetrics(SmallIconWidth),
+            GetSystemMetrics(SmallIconHeight));
+        var replacement = WireRouteTrayIconRenderer.Create(style, size, active, transitioning);
+        var previous = iconHandle;
+        iconHandle = replacement;
+        var data = CreateIconData();
+        if (isAdded && !ShellNotifyIcon(NotifyIconModify, ref data))
+        {
+            iconHandle = previous;
+            DestroyIcon(replacement);
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error(),
+                "WireRoute could not update its notification icon.");
+        }
+
+        appearanceStyle = style;
+        appearanceActive = active;
+        appearanceTransitioning = transitioning;
+        if (previous != 0 && previous != originalIconHandle)
+        {
+            DestroyIcon(previous);
+        }
+    }
 
     private nint ProcessWindowMessage(nint window, uint message, nint wParam, nint lParam)
     {
@@ -326,9 +367,14 @@ internal sealed class TrayIcon : IDisposable
             largeIconHandle = 0;
         }
 
-        if (iconHandle != 0)
+        if (iconHandle != 0 && iconHandle != originalIconHandle)
         {
             DestroyIcon(iconHandle);
+            iconHandle = 0;
+        }
+        if (originalIconHandle != 0)
+        {
+            DestroyIcon(originalIconHandle);
             iconHandle = 0;
         }
     }
