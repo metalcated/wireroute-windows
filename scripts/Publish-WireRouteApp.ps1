@@ -67,7 +67,8 @@ $requiredFiles = @(
     'WireRoute.App.pri',
     'App.xbf',
     'MainWindow.xbf',
-    'Assets\wireroute.ico'
+    'Assets\wireroute.ico',
+    'Assets\wireroute.png'
 )
 
 foreach ($requiredFile in $requiredFiles) {

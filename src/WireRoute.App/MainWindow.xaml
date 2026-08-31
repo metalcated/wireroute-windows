@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:WireRoute.App.Models"
-    Title="WireRoute">
+    Title="Manage WireRoute Tunnels">
 
     <Grid x:Name="Root" Background="{StaticResource NordicCanvasBrush}">
         <Grid.ColumnDefinitions>
@@ -20,12 +20,8 @@
 
         <Grid x:Name="TitleBarDragRegion" Grid.ColumnSpan="2" Height="48">
             <StackPanel Margin="18,0,0,0" VerticalAlignment="Center" Orientation="Horizontal" Spacing="10">
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="17"
-                    Foreground="{StaticResource NordicAccentBrush}"
-                    Glyph="&#xE83B;" />
-                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="16" FontWeight="SemiBold" Text="WireRoute" />
+                <Image Width="24" Height="24" Source="Assets/wireroute.png" />
+                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="16" FontWeight="SemiBold" Text="Manage WireRoute Tunnels" />
             </StackPanel>
         </Grid>
 

@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -469,23 +472,62 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowAboutAsync()
     {
-        var content = new StackPanel { Spacing = 8 };
-        content.Children.Add(new TextBlock
+        var appVersion = FileVersionInfo.GetVersionInfo(
+            typeof(App).Assembly.Location).ProductVersion ?? "Unknown";
+        var backendPath = Path.Combine(AppContext.BaseDirectory, "wireguard.exe");
+        var backendVersion = File.Exists(backendPath)
+            ? FileVersionInfo.GetVersionInfo(backendPath).ProductVersion ?? "Unknown"
+            : "Not installed";
+        var content = new StackPanel
         {
-            Text = "A native Windows client for clear, protected WireGuard routing.",
-            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Spacing = 10,
+        };
+        content.Children.Add(new Image
+        {
+            Width = 112,
+            Height = 112,
+            Margin = new Thickness(0, 4, 0, 12),
+            Source = new BitmapImage(new Uri(
+                Path.Combine(AppContext.BaseDirectory, "Assets", "wireroute.png"))),
         });
         content.Children.Add(new TextBlock
         {
-            Text = "Copyright © 2026 WireRoute contributors.\nPortions © 2018–2023 WireGuard LLC.",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontFamily = new FontFamily("Segoe UI Variable Display"),
+            FontSize = 34,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Text = "WireRoute",
+        });
+        content.Children.Add(new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 16,
+            Text = "App version: " + appVersion,
+        });
+        content.Children.Add(new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontFamily = new FontFamily("Cascadia Mono"),
+            FontSize = 14,
+            Text = "Native backend: " + backendVersion
+                + "  •  " + RuntimeInformation.ProcessArchitecture,
+        });
+        content.Children.Add(new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 14, 0, 0),
+            Text = "Copyright © 2026 WireRoute contributors."
+                + Environment.NewLine
+                + "Portions © 2018–2023 WireGuard LLC.",
             Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
+            TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
         });
 
         await ShowModalAsync(new ModalRequest
         {
             Title = "About WireRoute",
-            IconGlyph = "\uE946",
             Content = content,
             CancelText = "Done",
             MaxWidth = 620,
