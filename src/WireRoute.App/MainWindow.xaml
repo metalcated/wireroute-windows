@@ -466,6 +466,15 @@
                             Content="Set Up Peer…" />
                     </Grid>
 
+                    <TextBlock
+                        x:Name="RouterOSPeerActionHelpText"
+                        Margin="0,-8,0,0"
+                        Foreground="{StaticResource NordicSecondaryTextBrush}"
+                        FontSize="12"
+                        Text="Connect to this router to enable peer setup."
+                        TextAlignment="Right"
+                        TextWrapping="Wrap" />
+
                     <Border Style="{StaticResource NordicCardStyle}" Padding="0">
                         <Grid MinHeight="260">
                             <Grid.RowDefinitions>

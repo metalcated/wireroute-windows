@@ -241,10 +241,23 @@ public sealed partial class MainWindow
 
     private void UpdateRouterOSManagerAvailability()
     {
-        RouterOSSetUpPeerButton.IsEnabled = routerOSConnectedContext is not null
-            && routerOSInterfaces.Count > 0
+        var hasDiscovery = routerOSConnectedContext is not null;
+        var hasInterfaces = routerOSInterfaces.Count > 0;
+        var canImport = managerCapabilities?.CanImportProfiles == true;
+        RouterOSSetUpPeerButton.IsEnabled = hasDiscovery
+            && hasInterfaces
             && !isRouterOSBusy
-            && managerCapabilities?.CanImportProfiles == true;
+            && canImport;
+        RouterOSPeerActionHelpText.Text = !hasDiscovery
+            ? "Connect to this router to enable peer setup."
+            : !hasInterfaces
+                ? "No WireGuard interfaces were found on this router."
+                : !canImport
+                    ? "The tunnel manager is unavailable, so the generated profile cannot be imported."
+                    : string.Empty;
+        RouterOSPeerActionHelpText.Visibility = RouterOSSetUpPeerButton.IsEnabled
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     private async void MainWindow_Closed(object sender, WindowEventArgs args)

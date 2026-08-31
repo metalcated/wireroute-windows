@@ -91,6 +91,23 @@ public sealed partial class MainWindow : Window
         Activate();
     }
 
+    private void ShowManageTunnels()
+    {
+        var preferredProfile = selectedProfile is not null && Profiles.Contains(selectedProfile)
+            ? selectedProfile
+            : Profiles.FirstOrDefault();
+        if (preferredProfile is null)
+        {
+            ShowDestination(Destination.Profile);
+        }
+        else
+        {
+            ProfilesList.SelectedItem = preferredProfile;
+        }
+
+        ProfilesList.Focus(FocusState.Programmatic);
+    }
+
     private void UpdateProfilesEmptyState()
     {
         ProfilesEmptyState.Visibility = Profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -312,7 +329,7 @@ public sealed partial class MainWindow : Window
         XamlRoot = Root.XamlRoot,
         Title = title,
         Content = content,
-        Background = (Brush)Application.Current.Resources["NordicRaisedBrush"],
+        Background = (Brush)Application.Current.Resources["NordicCanvasBrush"],
         BorderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"],
         BorderThickness = new Thickness(1),
         CloseButtonText = "Done",
@@ -384,6 +401,7 @@ public sealed partial class MainWindow : Window
                 break;
             case TrayMenuActionKind.ManageTunnels:
                 RestoreWindowFromTray();
+                ShowManageTunnels();
                 break;
             case TrayMenuActionKind.ImportTunnels:
                 RestoreWindowFromTray();

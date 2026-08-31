@@ -345,27 +345,56 @@ public sealed partial class MainWindow
 
     private async Task ShowRouterOSConnectionEditorAsync(RouterOSStoredConnection? existing)
     {
+        var insetBrush = (Brush)Application.Current.Resources["NordicInsetBrush"];
+        var surfaceBrush = (Brush)Application.Current.Resources["NordicSurfaceBrush"];
+        var raisedBrush = (Brush)Application.Current.Resources["NordicRaisedBrush"];
+        var borderBrush = (Brush)Application.Current.Resources["NordicBorderBrush"];
+        var secondaryTextBrush = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"];
+        var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
+        var contentWidth = Math.Min(860, Math.Max(360, availableWidth - 112));
+        var compactInterfaceRow = contentWidth < 620;
+
         var nameField = new TextBox
         {
-            Header = "Name",
+            Background = insetBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 40,
             PlaceholderText = "Home Router",
             Text = existing?.Name ?? string.Empty,
         };
         var addressField = new TextBox
         {
-            Header = "Router address",
+            Background = insetBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 40,
             PlaceholderText = "https://router.example",
             Text = existing?.Url ?? string.Empty,
         };
         var usernameField = new TextBox
         {
-            Header = "Username",
+            Background = insetBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 40,
             PlaceholderText = "RouterOS API user",
             Text = existing?.Username ?? string.Empty,
         };
         var passwordField = new PasswordBox
         {
-            Header = "Password",
+            Background = insetBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 40,
             PlaceholderText = existing is null
                 ? "Required; protected with Windows DPAPI"
                 : "Leave blank to keep the saved password",
@@ -382,16 +411,26 @@ public sealed partial class MainWindow
 
         var defaultInterfacePicker = new ComboBox
         {
-            Header = "Default interface",
+            Background = insetBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
             ItemsSource = interfaceChoices,
+            MinHeight = 40,
             SelectedItem = initialInterface,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         var loadInterfacesButton = new Button
         {
             Content = "Connect and Load Interfaces",
+            Background = raisedBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
             HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Bottom,
+            MinHeight = 40,
+            Padding = new Thickness(14, 8, 14, 8),
+            VerticalAlignment = VerticalAlignment.Center,
         };
         var loadInterfacesProgress = new ProgressRing
         {
@@ -401,19 +440,43 @@ public sealed partial class MainWindow
             Visibility = Visibility.Collapsed,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        var interfaceGrid = new Grid { ColumnSpacing = 12 };
+        var interfaceGrid = new Grid { ColumnSpacing = 10, RowSpacing = 8 };
         interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(loadInterfacesButton, 1);
-        Grid.SetColumn(loadInterfacesProgress, 2);
+        if (compactInterfaceRow)
+        {
+            interfaceGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            interfaceGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumnSpan(defaultInterfacePicker, 2);
+            Grid.SetRow(loadInterfacesButton, 1);
+            Grid.SetRow(loadInterfacesProgress, 1);
+            Grid.SetColumn(loadInterfacesProgress, 1);
+        }
+        else
+        {
+            interfaceGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(loadInterfacesButton, 1);
+            Grid.SetColumn(loadInterfacesProgress, 2);
+        }
+
         interfaceGrid.Children.Add(defaultInterfacePicker);
         interfaceGrid.Children.Add(loadInterfacesButton);
         interfaceGrid.Children.Add(loadInterfacesProgress);
 
+        var interfaceHelpText = new TextBlock
+        {
+            Foreground = secondaryTextBrush,
+            FontSize = 12,
+            Text = "Connects read-only to list this router's WireGuard interfaces. No RouterOS settings are changed.",
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var defaultInterfaceStack = new StackPanel { Spacing = 5 };
+        defaultInterfaceStack.Children.Add(interfaceGrid);
+        defaultInterfaceStack.Children.Add(interfaceHelpText);
+
         var statusText = new TextBlock
         {
-            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
+            Foreground = secondaryTextBrush,
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
         };
@@ -422,38 +485,99 @@ public sealed partial class MainWindow
             Spacing = 10,
             Visibility = Visibility.Collapsed,
         };
-        var content = new StackPanel { MinWidth = 640, MaxWidth = 720, Spacing = 10 };
+
+        var formGrid = new Grid { ColumnSpacing = 14, RowSpacing = 12 };
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(compactInterfaceRow ? 118 : 150),
+        });
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var row = 0; row < 5; row++)
+        {
+            formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+
+        void AddFormRow(int row, string label, FrameworkElement field)
+        {
+            var labelText = new TextBlock
+            {
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Text = label,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            Grid.SetRow(labelText, row);
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, 1);
+            formGrid.Children.Add(labelText);
+            formGrid.Children.Add(field);
+        }
+
+        AddFormRow(0, "Name", nameField);
+        AddFormRow(1, "Router address", addressField);
+        AddFormRow(2, "Username", usernameField);
+        AddFormRow(3, "Password", passwordField);
+        AddFormRow(4, "Default interface", defaultInterfaceStack);
+
+        var formCard = new Border
+        {
+            Background = surfaceBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18),
+            Child = formGrid,
+        };
+        var cancelButton = new Button
+        {
+            Background = raisedBrush,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            Content = "Cancel",
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(16, 8, 16, 8),
+        };
+        var saveButton = new Button
+        {
+            Content = "Save Connection",
+            Padding = new Thickness(16, 8, 16, 8),
+            Style = (Style)Application.Current.Resources["NordicAccentButtonStyle"],
+        };
+        var buttonRow = new Grid { ColumnSpacing = 10 };
+        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        buttonRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(cancelButton, 1);
+        Grid.SetColumn(saveButton, 2);
+        buttonRow.Children.Add(cancelButton);
+        buttonRow.Children.Add(saveButton);
+
+        var content = new StackPanel { Width = contentWidth, Spacing = 12 };
         content.Children.Add(new TextBlock
         {
-            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
+            FontFamily = new FontFamily("Segoe UI Variable Display"),
+            FontSize = 28,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Text = existing is null ? "Add RouterOS Connection" : "Edit RouterOS Connection",
+        });
+        content.Children.Add(new TextBlock
+        {
+            Foreground = secondaryTextBrush,
             Text = "Name this router and enter its REST connection details. WireRoute protects the password with current-user Windows DPAPI.",
             TextWrapping = TextWrapping.Wrap,
         });
-        content.Children.Add(nameField);
-        content.Children.Add(addressField);
-        content.Children.Add(usernameField);
-        content.Children.Add(passwordField);
-        content.Children.Add(interfaceGrid);
-        content.Children.Add(new TextBlock
-        {
-            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
-            FontSize = 12,
-            Text = "Connects read-only to list this router's WireGuard interfaces. No RouterOS settings are changed.",
-            TextWrapping = TextWrapping.Wrap,
-        });
+        content.Children.Add(formCard);
         content.Children.Add(statusText);
         content.Children.Add(certificateReview);
+        content.Children.Add(buttonRow);
 
-        var dialog = CreateDialog(
-            existing is null ? "Add RouterOS Connection" : "Edit RouterOS Connection",
-            content);
-        dialog.PrimaryButtonText = "Save Connection";
-        dialog.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
-        dialog.CloseButtonText = "Cancel";
-        dialog.CloseButtonStyle = null;
-        dialog.DefaultButton = ContentDialogButton.Primary;
-        dialog.MinWidth = 700;
-        dialog.MaxWidth = 780;
+        var dialog = CreateDialog(string.Empty, content);
+        dialog.Title = null;
+        dialog.CloseButtonText = string.Empty;
+        dialog.DefaultButton = ContentDialogButton.None;
+        var dialogWidth = Math.Min(availableWidth - 32, contentWidth + 48);
+        dialog.MinWidth = dialogWidth;
+        dialog.MaxWidth = dialogWidth;
         RouterOSStoredConnection? saved = null;
 
         RouterOSStoredConnection ReadConnectionFields()
@@ -518,7 +642,8 @@ public sealed partial class MainWindow
             passwordField.IsEnabled = enableFields;
             defaultInterfacePicker.IsEnabled = enableFields;
             loadInterfacesButton.IsEnabled = enableFields;
-            dialog.IsPrimaryButtonEnabled = enableFields;
+            saveButton.IsEnabled = enableFields;
+            cancelButton.IsEnabled = !busy;
             loadInterfacesProgress.IsActive = busy;
             loadInterfacesProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -671,22 +796,21 @@ public sealed partial class MainWindow
         }
 
         loadInterfacesButton.Click += async (_, _) => await LoadInterfacesAsync(allowCertificateReview: true);
-        dialog.PrimaryButtonClick += async (_, args) =>
+        cancelButton.Click += (_, _) => dialog.Hide();
+        saveButton.Click += async (_, _) =>
         {
-            var deferral = args.GetDeferral();
+            saveButton.IsEnabled = false;
             try
             {
                 saved = ReadConnectionFields();
                 await routerOSConnectionStore.SaveAsync(saved);
+                dialog.Hide();
             }
             catch (Exception exception)
             {
-                args.Cancel = true;
+                saved = null;
+                saveButton.IsEnabled = true;
                 SetStatus(exception.Message, isError: true);
-            }
-            finally
-            {
-                deferral.Complete();
             }
         };
 
