@@ -235,6 +235,7 @@ public sealed partial class MainWindow
 
     private async void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        trayIcon.Dispose();
         managerCancellation.Cancel();
         if (managerClient is not null)
         {

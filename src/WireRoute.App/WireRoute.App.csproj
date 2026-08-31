@@ -23,4 +23,10 @@
     <ProjectReference Include="..\WireRoute.RouterOS\WireRoute.RouterOS.csproj" />
     <ProjectReference Include="..\WireRoute.Storage\WireRoute.Storage.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\ui\icon\wireroute.ico" Link="Assets\wireroute.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

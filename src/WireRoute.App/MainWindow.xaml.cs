@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using WireRoute.App.Interop;
 using WireRoute.App.Models;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
@@ -18,6 +19,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly AppWindow appWindow;
     private readonly nint windowHandle;
+    private readonly TrayIcon trayIcon;
     private readonly ManagerProtocolClient? managerClient;
     private readonly string? managerLaunchError;
     private ProfileNavigationItem? selectedProfile;
@@ -33,6 +35,8 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
         appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureWindow();
+        trayIcon = new TrayIcon(windowHandle, AppIconPath(), RestoreWindowFromTray);
+        appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadRouterOSConnectionsAsync();
         _ = InitializeManagerAsync();
@@ -43,6 +47,7 @@ public sealed partial class MainWindow : Window
 
     private void ConfigureWindow()
     {
+        appWindow.SetIcon(AppIconPath());
         appWindow.Resize(new SizeInt32(1180, 760));
         appWindow.SetPresenter(AppWindowPresenterKind.Overlapped);
         ExtendsContentIntoTitleBar = true;
@@ -58,6 +63,21 @@ public sealed partial class MainWindow : Window
             titleBar.ButtonHoverBackgroundColor = ColorHelper.FromArgb(255, 33, 50, 72);
             titleBar.ButtonPressedBackgroundColor = ColorHelper.FromArgb(255, 53, 74, 98);
         }
+    }
+
+    private static string AppIconPath() =>
+        Path.Combine(AppContext.BaseDirectory, "Assets", "wireroute.ico");
+
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        args.Cancel = true;
+        sender.Hide();
+    }
+
+    private void RestoreWindowFromTray()
+    {
+        appWindow.Show();
+        Activate();
     }
 
     private void UpdateProfilesEmptyState()
