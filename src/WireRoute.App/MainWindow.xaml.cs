@@ -113,6 +113,8 @@ public sealed partial class MainWindow : Window
         Activate();
     }
 
+    internal void RestoreFromExternalActivation() => RestoreWindowFromTray();
+
     private void ShowManageTunnels()
     {
         var preferredProfile = selectedProfile is not null && Profiles.Contains(selectedProfile)

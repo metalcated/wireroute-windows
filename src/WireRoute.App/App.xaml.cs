@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using Microsoft.Win32.SafeHandles;
 using WireRoute.Core.Manager;
 
@@ -7,17 +8,54 @@ namespace WireRoute.App;
 public partial class App : Application
 {
     private Window? window;
+    private AppInstance? registeredInstance;
+    private bool pendingActivation;
 
     public App()
     {
         InitializeComponent();
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (Environment.GetCommandLineArgs().Length == 1)
+        {
+            var currentInstance = AppInstance.GetCurrent();
+            registeredInstance = AppInstance.FindOrRegisterForKey("WireRoute.Main");
+            if (!registeredInstance.IsCurrent)
+            {
+                try
+                {
+                    await registeredInstance.RedirectActivationToAsync(
+                        currentInstance.GetActivatedEventArgs());
+                }
+                finally
+                {
+                    Exit();
+                }
+                return;
+            }
+            registeredInstance.Activated += RegisteredInstance_Activated;
+        }
+
         var managerClient = TryOpenManagerClient(out var managerLaunchError);
         window = new MainWindow(managerClient, managerLaunchError);
         window.Activate();
+        if (pendingActivation && window is MainWindow mainWindow)
+        {
+            pendingActivation = false;
+            mainWindow.RestoreFromExternalActivation();
+        }
+    }
+
+    private void RegisteredInstance_Activated(object? sender, AppActivationArguments args)
+    {
+        if (window is not MainWindow mainWindow)
+        {
+            pendingActivation = true;
+            return;
+        }
+        _ = mainWindow.DispatcherQueue.TryEnqueue(mainWindow.RestoreFromExternalActivation);
     }
 
     private static ManagerProtocolClient? TryOpenManagerClient(out string? error)
