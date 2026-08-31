@@ -503,6 +503,7 @@ public sealed partial class MainWindow
         {
             Text = string.Join(", ", item.Profile!.Interface.DnsServers),
             PlaceholderText = "DNS addresses from this WireGuard profile",
+            Visibility = Visibility.Collapsed,
         };
         var providerBox = new ComboBox
         {
@@ -529,10 +530,84 @@ public sealed partial class MainWindow
                     EncryptedDnsBootstrap[(string)providerBox.SelectedItem]),
         };
         var profilePanel = new StackPanel { Spacing = 10 };
-        profilePanel.Children.Add(SectionLabel("Configured DNS servers"));
-        profilePanel.Children.Add(configuredDns);
+        profilePanel.Children.Add(SectionLabel("Profile resolution path"));
         profilePanel.Children.Add(SecondaryText(
-            "These values are written directly to the WireGuard profile and use the VPN when covered by Allowed IPs."));
+            "The DNS values below come directly from this WireGuard configuration."));
+        profilePanel.Children.Add(SectionLabel("Configured DNS servers"));
+        var dnsRows = new StackPanel { Spacing = 8 };
+        foreach (var server in item.Profile.DnsRouteSummary.Servers)
+        {
+            var row = new Grid
+            {
+                Background = (Brush)Application.Current.Resources["NordicRaisedBrush"],
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12, 9, 12, 9),
+                ColumnSpacing = 10,
+            };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(new FontIcon
+            {
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 14,
+                Foreground = (Brush)Application.Current.Resources["NordicAccentBrush"],
+                Glyph = "\uE968",
+            });
+            var address = new TextBlock
+            {
+                FontFamily = new FontFamily("Cascadia Mono"),
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Text = server.Address,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            Grid.SetColumn(address, 1);
+            row.Children.Add(address);
+            var routeChip = new Border
+            {
+                Background = server.Route == DnsServerRoute.ThroughTunnel
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(46, 53, 205, 98))
+                    : (Brush)Application.Current.Resources["NordicInsetBrush"],
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 3, 8, 3),
+                Child = new TextBlock
+                {
+                    Foreground = server.Route == DnsServerRoute.ThroughTunnel
+                        ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 70, 225, 116))
+                        : (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
+                    FontSize = 11,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Text = server.Route == DnsServerRoute.ThroughTunnel ? "Via VPN" : "Outside VPN",
+                },
+            };
+            Grid.SetColumn(routeChip, 2);
+            row.Children.Add(routeChip);
+            dnsRows.Children.Add(row);
+        }
+        if (dnsRows.Children.Count == 0)
+        {
+            dnsRows.Children.Add(SecondaryText("No DNS servers are configured in this profile."));
+        }
+        profilePanel.Children.Add(dnsRows);
+        profilePanel.Children.Add(configuredDns);
+        var editDnsButton = new Button
+        {
+            Content = "Edit Profile DNS…",
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        var editingProfileDns = false;
+        editDnsButton.Click += (_, _) =>
+        {
+            editingProfileDns = !editingProfileDns;
+            configuredDns.Visibility = editingProfileDns ? Visibility.Visible : Visibility.Collapsed;
+            dnsRows.Visibility = editingProfileDns ? Visibility.Collapsed : Visibility.Visible;
+            editDnsButton.Content = editingProfileDns ? "Done Editing" : "Edit Profile DNS…";
+            if (editingProfileDns)
+            {
+                configuredDns.Focus(FocusState.Programmatic);
+            }
+        };
+        profilePanel.Children.Add(editDnsButton);
         var encryptedPanel = new StackPanel { Spacing = 10 };
         encryptedPanel.Children.Add(SectionLabel("Resolver"));
         encryptedPanel.Children.Add(providerBox);
@@ -601,6 +676,13 @@ public sealed partial class MainWindow
                         configuration = WireGuardConfigFormatter.ToWgQuick(
                             item.Profile!,
                             dnsServers: dns);
+                        if (WireGuardPrivateRouteExclusion.Evaluate(item.Profile).IsEnabled)
+                        {
+                            var parsedDnsChange = WireGuardConfigParser.Parse(configuration, item.Name);
+                            configuration = WireGuardPrivateRouteExclusion.RefreshDnsRoutes(
+                                parsedDnsChange,
+                                item.Profile.Interface.DnsServers);
+                        }
                     }
                     var provider = providerBox.SelectedItem as string ?? "Custom";
                     var resolver = encrypted ? resolverBox.Text.Trim() : null;

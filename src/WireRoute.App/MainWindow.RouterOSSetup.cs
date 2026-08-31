@@ -86,64 +86,80 @@ public sealed partial class MainWindow
     {
         var interfacePicker = new ComboBox
         {
-            Header = "WireGuard interface",
             DisplayMemberPath = "Name",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             ItemsSource = routerOSInterfaces,
         };
         interfacePicker.SelectedItem = routerOSInterfaces.FirstOrDefault(value =>
             value.Name.Equals(state.InterfaceName, StringComparison.Ordinal));
         var nameField = new TextBox
         {
-            Header = "Device name",
             PlaceholderText = "Laptop",
             Text = state.Name,
         };
         var addressField = new TextBox
         {
-            Header = "Client address",
             PlaceholderText = "10.0.0.2/32",
             Text = state.ClientAddress,
         };
         var addressHelp = SetupHelpText(string.Empty);
         var endpointField = new TextBox
         {
-            Header = "Public endpoint",
             PlaceholderText = "vpn.example.com",
             Text = state.EndpointAddress,
         };
         var endpointPortField = new TextBox
         {
-            Header = "Endpoint port",
             PlaceholderText = "51820",
             Text = state.EndpointPort,
         };
         var dnsField = new TextBox
         {
-            Header = "DNS servers",
             PlaceholderText = "1.1.1.1, 9.9.9.9",
             Text = state.DnsServers,
         };
-        var routeModePicker = new ComboBox
+        var splitRouteButton = new Button
         {
-            Header = "Routing mode",
-            SelectedIndex = state.RouteModeIndex,
+            Content = "Split",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        routeModePicker.Items.Add("Split routing");
-        routeModePicker.Items.Add("Full routing");
+        var fullRouteButton = new Button
+        {
+            Content = "Full",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var routeModeGrid = new Grid
+        {
+            Height = 40,
+            Background = (Brush)Application.Current.Resources["NordicRaisedBrush"],
+            CornerRadius = new CornerRadius(6),
+        };
+        routeModeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        routeModeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(fullRouteButton, 1);
+        routeModeGrid.Children.Add(splitRouteButton);
+        routeModeGrid.Children.Add(fullRouteButton);
+        var routeModeIndex = state.RouteModeIndex;
         var routesField = new TextBox
         {
             AcceptsReturn = true,
-            Header = "Client routes",
-            Height = 74,
+            MinHeight = 110,
             PlaceholderText = "10.0.0.0/8, 192.168.0.0/16",
             Text = state.Routes,
             TextWrapping = TextWrapping.Wrap,
         };
-        var routesHelp = SetupHelpText(
-            "For Split routing, enter only the private networks this device should reach. Full routing adds the matching default route automatically.");
+        var routesHelp = new StackPanel { Spacing = 4 };
+        routesHelp.Children.Add(new TextBlock
+        {
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Text = "Not sure what to enter?",
+        });
+        routesHelp.Children.Add(SetupHelpText(
+            "Add networks that exist behind this VPN, such as your home, office, or VPN address range.\n"
+            + "Examples only — replace them with your networks:\n192.168.50.0/24\n10.20.0.0/16"));
         var keepaliveField = new TextBox
         {
-            Header = "Persistent keepalive (seconds)",
+            Width = 120,
             Text = state.PersistentKeepalive,
         };
         var errorText = new TextBlock
@@ -186,38 +202,84 @@ public sealed partial class MainWindow
 
         void UpdateRouteMode()
         {
-            routesField.IsEnabled = routeModePicker.SelectedIndex == 0;
+            routesField.IsEnabled = routeModeIndex == 0;
             routesField.Opacity = routesField.IsEnabled ? 1 : 0.6;
+            splitRouteButton.Background = routeModeIndex == 0
+                ? (Brush)Application.Current.Resources["NordicAccentBrush"]
+                : (Brush)Application.Current.Resources["NordicRaisedBrush"];
+            fullRouteButton.Background = routeModeIndex == 1
+                ? (Brush)Application.Current.Resources["NordicAccentBrush"]
+                : (Brush)Application.Current.Resources["NordicRaisedBrush"];
         }
 
         interfacePicker.SelectionChanged += (_, _) => UpdateInterfaceSuggestions();
-        routeModePicker.SelectionChanged += (_, _) => UpdateRouteMode();
+        splitRouteButton.Click += (_, _) => { routeModeIndex = 0; UpdateRouteMode(); };
+        fullRouteButton.Click += (_, _) => { routeModeIndex = 1; UpdateRouteMode(); };
         UpdateInterfaceSuggestions();
         UpdateRouteMode();
 
-        var form = new StackPanel { Spacing = 10 };
-        form.Children.Add(new TextBlock
-        {
-            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
-            Text = "WireRoute generated this device’s private key locally. It will never be sent to RouterOS.",
-            TextWrapping = TextWrapping.Wrap,
-        });
-        form.Children.Add(interfacePicker);
-        form.Children.Add(nameField);
-        form.Children.Add(addressField);
-        form.Children.Add(addressHelp);
         var endpointGrid = new Grid { ColumnSpacing = 10 };
         endpointGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         endpointGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
         Grid.SetColumn(endpointPortField, 1);
         endpointGrid.Children.Add(endpointField);
         endpointGrid.Children.Add(endpointPortField);
-        form.Children.Add(endpointGrid);
-        form.Children.Add(dnsField);
-        form.Children.Add(routeModePicker);
-        form.Children.Add(routesField);
-        form.Children.Add(routesHelp);
-        form.Children.Add(keepaliveField);
+        var addressStack = new StackPanel { Spacing = 4 };
+        addressStack.Children.Add(addressField);
+        addressStack.Children.Add(addressHelp);
+        var routeStack = new StackPanel { Spacing = 10 };
+        routeStack.Children.Add(routeModeGrid);
+        routeStack.Children.Add(routesField);
+        routeStack.Children.Add(ModalCard(routesHelp, raised: true));
+        var keepaliveStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        keepaliveStack.Children.Add(keepaliveField);
+        keepaliveStack.Children.Add(new TextBlock
+        {
+            Text = "seconds",
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        var formGrid = new Grid { ColumnSpacing = 20, RowSpacing = 12 };
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var row = 0; row < 7; row++)
+        {
+            formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+
+        void AddSetupRow(int row, string label, FrameworkElement field)
+        {
+            var labelText = new TextBlock
+            {
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Text = label,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 9, 0, 0),
+            };
+            Grid.SetRow(labelText, row);
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, 1);
+            formGrid.Children.Add(labelText);
+            formGrid.Children.Add(field);
+        }
+
+        AddSetupRow(0, "Interface", interfacePicker);
+        AddSetupRow(1, "Device name", nameField);
+        AddSetupRow(2, "Client address", addressStack);
+        AddSetupRow(3, "Public endpoint / port", endpointGrid);
+        AddSetupRow(4, "DNS servers", dnsField);
+        AddSetupRow(5, "Client routes", routeStack);
+        AddSetupRow(6, "Keepalive", keepaliveStack);
+
+        var form = new StackPanel { Spacing = 12 };
+        form.Children.Add(new TextBlock
+        {
+            Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
+            Text = "WireRoute generated this device’s private key locally. It will never be sent to RouterOS.",
+            TextWrapping = TextWrapping.Wrap,
+        });
+        form.Children.Add(formGrid);
         form.Children.Add(errorText);
         RouterOSPeerSetupProposal? proposal = null;
         ModalRequest? request = null;
@@ -242,7 +304,7 @@ public sealed partial class MainWindow
                         endpointField.Text,
                         endpointPortField.Text,
                         dnsField.Text,
-                        routeModePicker.SelectedIndex,
+                        routeModeIndex,
                         routesField.Text,
                         keepaliveField.Text);
                     return Task.FromResult(true);
@@ -331,7 +393,7 @@ public sealed partial class MainWindow
 
     private Task<WireRouteModalResult> ShowRouterOSPeerReviewAsync(RouterOSPeerSetupProposal proposal)
     {
-        var content = new StackPanel { MinWidth = 540, Spacing = 10 };
+        var content = new StackPanel { Spacing = 10 };
         content.Children.Add(new TextBlock
         {
             Text = "WireRoute will add exactly one WireGuard peer. It will not change RouterOS addresses, routes, firewall rules, or NAT.",
