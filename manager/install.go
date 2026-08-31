@@ -211,7 +211,10 @@ func installTunnel(configPath string, ephemeral bool) error {
 		}
 		switch status.State {
 		case svc.Running:
-			return service.Delete()
+			// Keep the demand-start tunnel service addressable while the tunnel
+			// is active. The explicit stop path removes it immediately after
+			// disconnect, so no inactive service remains installed.
+			return nil
 		case svc.Stopped:
 			_ = service.Delete()
 			return errors.New("Tunnel stopped before startup completed")
