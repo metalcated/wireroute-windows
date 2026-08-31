@@ -1,11 +1,20 @@
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Routing;
+using WireRoute.Storage;
 
 namespace WireRoute.App.Models;
 
 public sealed class ProfileNavigationItem
 {
+    public ProfileNavigationItem(WireRouteStoredProfile storedProfile, WireGuardProfile profile)
+        : this(profile, displayName: storedProfile.Name)
+    {
+        StoredProfile = storedProfile;
+        Status = "Inactive";
+        RoutingLabel = storedProfile.RouteMode == StoredTunnelRouteMode.Full ? "Full" : "Split";
+    }
+
     public ProfileNavigationItem(
         WireGuardProfile profile,
         string? managerName = null,
@@ -29,7 +38,9 @@ public sealed class ProfileNavigationItem
         RoutingLabel = profile.DetectedRouteMode == TunnelRouteMode.Full ? "Full" : "Split";
     }
 
-    public WireGuardProfile? Profile { get; }
+    public WireGuardProfile? Profile { get; private set; }
+
+    public WireRouteStoredProfile? StoredProfile { get; private set; }
 
     public string Name { get; set; }
 
@@ -42,6 +53,16 @@ public sealed class ProfileNavigationItem
     internal ManagerTunnelState ManagerState { get; private set; }
 
     internal bool IsManaged => ManagerName is not null;
+
+    internal bool IsStoredLocally => StoredProfile is not null;
+
+    internal void UpdateStoredProfile(WireRouteStoredProfile storedProfile, WireGuardProfile profile)
+    {
+        StoredProfile = storedProfile;
+        Profile = profile;
+        Name = storedProfile.Name;
+        RoutingLabel = storedProfile.RouteMode == StoredTunnelRouteMode.Full ? "Full" : "Split";
+    }
 
     internal void UpdateState(ManagerTunnelState state)
     {

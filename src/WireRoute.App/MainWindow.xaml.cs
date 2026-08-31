@@ -12,6 +12,7 @@ using WireRoute.App.Models;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
+using WireRoute.Storage;
 
 namespace WireRoute.App;
 
@@ -22,6 +23,7 @@ public sealed partial class MainWindow : Window
     private readonly TrayIcon trayIcon;
     private readonly ManagerProtocolClient? managerClient;
     private readonly string? managerLaunchError;
+    private readonly WireGuardProfileStore profileStore = new();
     private ProfileNavigationItem? selectedProfile;
     private bool isExiting;
 
@@ -44,6 +46,7 @@ public sealed partial class MainWindow : Window
             ExecuteTrayMenuAction);
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
+        _ = LoadStoredProfilesAsync();
         _ = LoadRouterOSConnectionsAsync();
         _ = InitializeManagerAsync();
         Closed += MainWindow_Closed;
@@ -113,6 +116,35 @@ public sealed partial class MainWindow : Window
         ProfilesEmptyState.Visibility = Profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private async Task LoadStoredProfilesAsync()
+    {
+        try
+        {
+            var storedProfiles = await profileStore.LoadAllAsync();
+            foreach (var storedProfile in storedProfiles)
+            {
+                try
+                {
+                    var profile = WireGuardConfigParser.Parse(storedProfile.Configuration, storedProfile.Name);
+                    Profiles.Add(new ProfileNavigationItem(storedProfile, profile));
+                }
+                catch (WireGuardConfigParseException)
+                {
+                    // Leave malformed protected entries untouched for a future recovery flow.
+                }
+            }
+
+            if (ProfilesList.SelectedItem is null && Profiles.Count > 0)
+            {
+                ProfilesList.SelectedItem = Profiles[0];
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync("Saved profiles are unavailable", exception.Message);
+        }
+    }
+
     private async void ImportProfileButton_Click(object sender, RoutedEventArgs e)
     {
         await ImportProfilesAsync();
@@ -160,7 +192,25 @@ public sealed partial class MainWindow : Window
 
                     var text = await FileIO.ReadTextAsync(file);
                     var profile = WireGuardConfigParser.Parse(text, profileName);
-                    var item = new ProfileNavigationItem(profile);
+                    var now = DateTimeOffset.UtcNow;
+                    var storedProfile = new WireRouteStoredProfile(
+                        Guid.NewGuid(),
+                        profileName,
+                        text,
+                        profile.DetectedRouteMode == TunnelRouteMode.Full
+                            ? StoredTunnelRouteMode.Full
+                            : StoredTunnelRouteMode.Split,
+                        profile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
+                        StoredDnsProtectionMode.Profile,
+                        null,
+                        null,
+                        Array.Empty<string>(),
+                        OnDemandEthernet: false,
+                        OnDemandWiFi: false,
+                        now,
+                        now);
+                    await profileStore.SaveAsync(storedProfile);
+                    var item = new ProfileNavigationItem(storedProfile, profile);
                     Profiles.Add(item);
                     firstImportedItem ??= item;
                 }

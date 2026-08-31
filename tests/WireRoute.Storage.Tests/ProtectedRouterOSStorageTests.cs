@@ -10,6 +10,51 @@ namespace WireRoute.Storage.Tests;
 public sealed class ProtectedRouterOSStorageTests
 {
     [TestMethod]
+    public async Task ProfileStoreProtectsAndRoundTripsConfiguration()
+    {
+        var directory = NewStorageDirectory();
+        try
+        {
+            var store = new WireGuardProfileStore(directory);
+            var now = DateTimeOffset.UtcNow;
+            var profile = new WireRouteStoredProfile(
+                Guid.NewGuid(),
+                "Laptop",
+                "[Interface]\nPrivateKey = sensitive-material",
+                StoredTunnelRouteMode.Split,
+                new[] { "192.168.50.0/24" },
+                StoredDnsProtectionMode.Profile,
+                null,
+                null,
+                Array.Empty<string>(),
+                false,
+                false,
+                now,
+                now);
+
+            await store.SaveAsync(profile);
+
+            var loaded = await store.LoadAllAsync();
+            Assert.AreEqual(1, loaded.Count);
+            Assert.AreEqual(profile.Id, loaded[0].Id);
+            Assert.AreEqual(profile.Name, loaded[0].Name);
+            Assert.AreEqual(profile.Configuration, loaded[0].Configuration);
+            CollectionAssert.AreEqual(profile.SplitRoutes.ToArray(), loaded[0].SplitRoutes.ToArray());
+            var protectedBytes = await File.ReadAllBytesAsync(
+                Path.Combine(directory, "wireguard-profiles.dpapi"));
+            var protectedText = System.Text.Encoding.UTF8.GetString(protectedBytes);
+            Assert.IsFalse(protectedText.Contains("sensitive-material", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
     public void DpapiRoundTripUsesNonInteractiveCurrentUserProtection()
     {
         var plaintext = Encoding.UTF8.GetBytes("router-password-that-must-not-be-plaintext");

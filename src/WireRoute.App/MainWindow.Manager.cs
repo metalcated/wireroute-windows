@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using WireRoute.App.Models;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Profiles;
+using WireRoute.Storage;
 
 namespace WireRoute.App;
 
@@ -146,7 +147,9 @@ public sealed partial class MainWindow
     {
         ProfileStorageStatusText.Text = item.IsManaged
             ? "Saved securely by the WireRoute tunnel manager"
-            : "Imported locally for review • Not saved to the manager";
+            : item.IsStoredLocally
+                ? "Saved securely on this PC with Windows DPAPI"
+                : "Imported locally for review • Not saved";
         var canChangeState = item.ManagerState == ManagerTunnelState.Started
             ? managerCapabilities?.CanStopTunnels == true
             : managerCapabilities?.CanStartTunnels == true;
@@ -213,8 +216,29 @@ public sealed partial class MainWindow
     {
         if (managerClient is null || managerCapabilities?.CanImportProfiles != true)
         {
-            throw new ManagerProtocolException(
-                "The privileged tunnel manager is not connected. Restart WireRoute through its installed service and try again.");
+            var profile = WireGuardConfigParser.Parse(wgQuickConfiguration, displayName);
+            var now = DateTimeOffset.UtcNow;
+            var storedProfile = new WireRouteStoredProfile(
+                Guid.NewGuid(),
+                displayName,
+                wgQuickConfiguration,
+                profile.DetectedRouteMode == TunnelRouteMode.Full
+                    ? StoredTunnelRouteMode.Full
+                    : StoredTunnelRouteMode.Split,
+                profile.SuggestedSplitAllowedIps.Select(route => route.Notation).ToArray(),
+                StoredDnsProtectionMode.Profile,
+                null,
+                null,
+                Array.Empty<string>(),
+                OnDemandEthernet: false,
+                OnDemandWiFi: false,
+                now,
+                now);
+            await profileStore.SaveAsync(storedProfile, managerCancellation.Token);
+            var localItem = new ProfileNavigationItem(storedProfile, profile);
+            Profiles.Add(localItem);
+            ProfilesList.SelectedItem = localItem;
+            return localItem;
         }
 
         var result = await managerClient.RequestAsync<ManagerImportProfileRequest, ManagerImportProfileResponse>(
@@ -243,7 +267,7 @@ public sealed partial class MainWindow
     {
         var hasDiscovery = routerOSConnectedContext is not null;
         var hasInterfaces = routerOSInterfaces.Count > 0;
-        var canImport = managerCapabilities?.CanImportProfiles == true;
+        var canImport = true;
         RouterOSSetUpPeerButton.IsEnabled = hasDiscovery
             && hasInterfaces
             && !isRouterOSBusy
@@ -252,9 +276,7 @@ public sealed partial class MainWindow
             ? "Connect to this router to enable peer setup."
             : !hasInterfaces
                 ? "No WireGuard interfaces were found on this router."
-                : !canImport
-                    ? "The tunnel manager is unavailable, so the generated profile cannot be imported."
-                    : string.Empty;
+                : string.Empty;
         RouterOSPeerActionHelpText.Visibility = RouterOSSetUpPeerButton.IsEnabled
             ? Visibility.Collapsed
             : Visibility.Visible;
