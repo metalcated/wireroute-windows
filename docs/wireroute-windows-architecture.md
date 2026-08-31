@@ -19,10 +19,12 @@
 ## Profile and tunnel boundary
 
 - The WinUI app imports, validates, edits, creates, exports, and protects WireGuard configurations.
+- Friendly profile names are stored separately from stable WireGuardNT tunnel identifiers, so macOS-style names such as `iPhone 12 Dev` remain visible without violating Windows service-name constraints.
 - Private and preshared keys stay inside protected profile data except for explicit copy, QR, or export actions.
 - Activation writes a short-lived plaintext configuration under the current user's WireRoute runtime directory. The elevated backend consumes it, and the UI deletes it immediately after startup completes.
 - `PreUp`, `PostUp`, `PreDown`, and `PostDown` commands are detected and blocked before activation in service-free mode.
 - Split and Full modes rewrite the active profile's allowed routes through the shared parser and formatter.
+- The single-peer private-IP exclusion control uses the same non-private IPv4 route set and DNS-route updates as the released macOS editor.
 - Profile DNS is applied by the WireGuard tunnel service.
 - Encrypted DNS uses an in-process loopback proxy on `127.0.0.1:53`, forwards RFC 8484 messages over HTTPS/HTTP2 to the selected resolver, and makes no persistent system-wide DNS changes.
 

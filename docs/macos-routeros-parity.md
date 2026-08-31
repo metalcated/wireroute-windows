@@ -20,11 +20,11 @@ The Windows RouterOS workflow uses the released macOS implementation at Apple co
 | macOS boundary | Windows counterpart |
 | --- | --- |
 | Keychain connection and certificate storage | Current-user DPAPI-protected storage, with no plaintext password or certificate-pin file |
-| NetworkExtension tunnel preferences | Privileged manager configuration store encrypted with the inherited WireGuard for Windows DPAPI format |
-| NetworkExtension activation | Existing WireGuard for Windows tunnel service and WireGuardNT lifecycle |
-| AppKit sheets and alerts | WinUI `ContentDialog` modals |
+| NetworkExtension tunnel preferences | Current-user DPAPI-protected WireRoute profile store |
+| NetworkExtension activation | Demand-start per-tunnel WireGuard service and WireGuardNT lifecycle; no persistent manager service |
+| AppKit sheets and alerts | Responsive app-owned WinUI modal host |
 | `PrivateKey()` generation | Windows CNG X25519 generation in the unprivileged client process |
 
-WireGuard for Windows tunnel service identifiers are limited to 1–32 ASCII letters, numbers, and `_ = + . -` characters. macOS display names do not have this restriction. Windows therefore keeps the user-entered device name as profile metadata and derives a separate collision-checked service identifier at the manager boundary. The UI must not silently replace the displayed device name.
+WireGuard for Windows tunnel service identifiers are limited to 1–32 ASCII letters, numbers, and `_ = + . -` characters. macOS display names do not have this restriction. Windows therefore keeps the user-entered device name as profile metadata and derives a separate collision-checked, stable tunnel identifier before RouterOS review. The UI never silently replaces the displayed device name.
 
 The RouterOS REST paths, payload field names, TLS pin semantics, 15-second request timeout, no-redirect behavior, validation rules, and recovery ordering remain equivalent to macOS.
