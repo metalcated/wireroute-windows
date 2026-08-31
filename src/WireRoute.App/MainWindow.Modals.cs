@@ -86,6 +86,14 @@ public sealed partial class MainWindow
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+        if (request.LeadingFooterContent is not null)
+        {
+            request.LeadingFooterContent.HorizontalAlignment = HorizontalAlignment.Left;
+            request.LeadingFooterContent.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(request.LeadingFooterContent, 0);
+            footer.Children.Add(request.LeadingFooterContent);
+        }
+
         Button? cancelButton = null;
         Button? secondaryButton = null;
         Button? primaryButton = null;
@@ -264,6 +272,8 @@ public sealed partial class MainWindow
         public string? SecondaryText { get; init; }
 
         public string? CancelText { get; init; } = "Cancel";
+
+        public FrameworkElement? LeadingFooterContent { get; init; }
 
         public double MaxWidth { get; init; } = 900;
 

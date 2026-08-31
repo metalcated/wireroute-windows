@@ -105,6 +105,98 @@ public sealed partial class MainWindow
             TextWrapping = TextWrapping.NoWrap,
         };
         var errorText = ModalErrorText();
+        var excludePrivateIpsBox = new CheckBox
+        {
+            Content = "Exclude private IPs",
+            Visibility = Visibility.Collapsed,
+        };
+        IReadOnlyList<string>? dnsServersAddedToAllowedIps = null;
+        var updatingPrivateRouteControl = false;
+
+        string EditorProfileName()
+        {
+            var proposedName = nameBox.Text.Trim();
+            return WireGuardConfigParser.IsValidProfileName(proposedName)
+                ? proposedName
+                : item?.Name ?? "WireRoute";
+        }
+
+        void UpdatePrivateRouteControl()
+        {
+            if (updatingPrivateRouteControl)
+            {
+                return;
+            }
+
+            try
+            {
+                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorProfileName());
+                var state = WireGuardPrivateRouteExclusion.Evaluate(parsed);
+                updatingPrivateRouteControl = true;
+                excludePrivateIpsBox.Visibility = state.IsAvailable
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                excludePrivateIpsBox.IsChecked = state.IsEnabled;
+            }
+            catch (WireGuardConfigParseException)
+            {
+                updatingPrivateRouteControl = true;
+                excludePrivateIpsBox.Visibility = Visibility.Collapsed;
+                excludePrivateIpsBox.IsChecked = false;
+            }
+            finally
+            {
+                updatingPrivateRouteControl = false;
+            }
+        }
+
+        try
+        {
+            var initialProfile = WireGuardConfigParser.Parse(initialConfiguration, EditorProfileName());
+            var initialState = WireGuardPrivateRouteExclusion.Evaluate(initialProfile);
+            if (initialState.IsEnabled)
+            {
+                dnsServersAddedToAllowedIps = initialProfile.Interface.DnsServers.ToArray();
+            }
+        }
+        catch (WireGuardConfigParseException)
+        {
+        }
+
+        configurationBox.TextChanged += (_, _) => UpdatePrivateRouteControl();
+        excludePrivateIpsBox.Click += (_, _) =>
+        {
+            if (updatingPrivateRouteControl)
+            {
+                return;
+            }
+
+            try
+            {
+                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorProfileName());
+                var enable = excludePrivateIpsBox.IsChecked == true;
+                updatingPrivateRouteControl = true;
+                configurationBox.Text = WireGuardPrivateRouteExclusion.SetEnabled(
+                    parsed,
+                    enable,
+                    dnsServersAddedToAllowedIps);
+                dnsServersAddedToAllowedIps = enable
+                    ? parsed.Interface.DnsServers.ToArray()
+                    : null;
+            }
+            catch (Exception exception) when (
+                exception is WireGuardConfigParseException or ArgumentException)
+            {
+                excludePrivateIpsBox.IsChecked = excludePrivateIpsBox.IsChecked != true;
+                errorText.Text = exception.Message;
+                errorText.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                updatingPrivateRouteControl = false;
+                UpdatePrivateRouteControl();
+            }
+        };
         var identityGrid = new Grid { RowSpacing = 10, ColumnSpacing = 12 };
         identityGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
         identityGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -146,6 +238,7 @@ public sealed partial class MainWindow
             Content = content,
             PrimaryText = "Save",
             CancelText = item is null ? "Discard" : "Cancel",
+            LeadingFooterContent = excludePrivateIpsBox,
             MaxWidth = 900,
             OnPrimary = async () =>
             {
@@ -154,6 +247,15 @@ public sealed partial class MainWindow
                     var name = nameBox.Text.Trim();
                     var configuration = configurationBox.Text.Trim() + Environment.NewLine;
                     var parsed = WireGuardConfigParser.Parse(configuration, name);
+                    if (excludePrivateIpsBox.IsChecked == true
+                        && dnsServersAddedToAllowedIps is not null
+                        && parsed.Peers.Count == 1)
+                    {
+                        configuration = WireGuardPrivateRouteExclusion.RefreshDnsRoutes(
+                            parsed,
+                            dnsServersAddedToAllowedIps);
+                        parsed = WireGuardConfigParser.Parse(configuration, name);
+                    }
                     var existing = item?.StoredProfile;
                     var now = DateTimeOffset.UtcNow;
                     var stored = new WireRouteStoredProfile(
@@ -207,6 +309,7 @@ public sealed partial class MainWindow
         var modal = ShowModalAsync(request);
         DispatcherQueue.TryEnqueue(() =>
         {
+            UpdatePrivateRouteControl();
             nameBox.Focus(FocusState.Programmatic);
             nameBox.SelectAll();
         });
