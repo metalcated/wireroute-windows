@@ -67,6 +67,18 @@ public sealed partial class MainWindow
             };
             header.Children.Add(subtitle);
         }
+        var unhandledErrorText = new TextBlock
+        {
+            Margin = new Thickness(
+                string.IsNullOrWhiteSpace(request.IconGlyph) ? 0 : 64,
+                4,
+                0,
+                0),
+            Foreground = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        header.Children.Add(unhandledErrorText);
 
         var footer = new Grid { ColumnSpacing = 10 };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -105,8 +117,8 @@ public sealed partial class MainWindow
         ModalFooterPresenter.Content = footer;
         var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
         var availableHeight = Root.ActualHeight > 0 ? Root.ActualHeight : 760;
-        ModalFrame.Width = Math.Max(320, Math.Min(request.MaxWidth, availableWidth - 48));
-        ModalFrame.MaxHeight = Math.Max(320, availableHeight - 48);
+        ModalFrame.Width = Math.Min(request.MaxWidth, Math.Max(240, availableWidth - 48));
+        ModalFrame.MaxHeight = Math.Max(240, availableHeight - 48);
         ModalOverlay.Visibility = Visibility.Visible;
 
         void Finish(WireRouteModalResult result)
@@ -142,6 +154,12 @@ public sealed partial class MainWindow
                 {
                     shouldClose = await action();
                 }
+            }
+            catch (Exception exception)
+            {
+                unhandledErrorText.Text = exception.Message;
+                unhandledErrorText.Visibility = Visibility.Visible;
+                shouldClose = false;
             }
             finally
             {
@@ -223,6 +241,7 @@ public sealed partial class MainWindow
         private Button? primaryButton;
         private Button? secondaryButton;
         private Button? cancelButton;
+        private bool isCancelEnabled = true;
 
         public required string Title { get; init; }
 
@@ -261,6 +280,7 @@ public sealed partial class MainWindow
 
         public void SetCancelEnabled(bool isEnabled)
         {
+            isCancelEnabled = isEnabled;
             if (cancelButton is not null)
             {
                 cancelButton.IsEnabled = isEnabled && !IsBusy;
@@ -282,7 +302,7 @@ public sealed partial class MainWindow
 
             if (cancelButton is not null)
             {
-                cancelButton.IsEnabled = !isBusy;
+                cancelButton.IsEnabled = isCancelEnabled && !isBusy;
             }
         }
 
@@ -291,6 +311,10 @@ public sealed partial class MainWindow
             primaryButton = primary;
             secondaryButton = secondary;
             cancelButton = cancel;
+            if (cancelButton is not null)
+            {
+                cancelButton.IsEnabled = isCancelEnabled && !IsBusy;
+            }
         }
 
         public void DetachButtons()

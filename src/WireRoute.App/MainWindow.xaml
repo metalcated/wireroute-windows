@@ -155,26 +155,46 @@
             <Grid Grid.Row="5" Margin="0,12,0,0" ColumnSpacing="6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Button
                     x:Name="ImportProfileButton"
-                    Click="ImportProfileButton_Click"
                     Style="{StaticResource SidebarActionButtonStyle}"
-                    ToolTipService.ToolTip="Import one or more WireGuard .conf files for review.">
-                    <StackPanel Orientation="Horizontal" Spacing="9">
+                    ToolTipService.ToolTip="Add or import a WireGuard profile.">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
                         <FontIcon FontFamily="Segoe Fluent Icons" FontSize="14" Glyph="&#xE710;" />
-                        <TextBlock Text="Import profile" />
-                    </StackPanel>
-                </Button>
-                <Button Grid.Column="1" Style="{StaticResource SidebarActionButtonStyle}">
-                    <FontIcon FontFamily="Segoe Fluent Icons" FontSize="16" Glyph="&#xE712;" />
+                        <TextBlock Grid.Column="1" Margin="8,0" Text="Add profile" />
+                        <FontIcon Grid.Column="2" FontFamily="Segoe Fluent Icons" FontSize="11" Glyph="&#xE70D;" />
+                    </Grid>
                     <Button.Flyout>
                         <MenuFlyout>
-                            <MenuFlyoutItem IsEnabled="False" Text="Export profiles…" />
-                            <MenuFlyoutItem IsEnabled="False" Text="View log…" />
+                            <MenuFlyoutItem Click="AddEmptyProfileMenuItem_Click" Icon="Add" Text="Add Empty Tunnel…" />
+                            <MenuFlyoutItem Click="ImportProfileMenuItem_Click" Text="Import Tunnel(s) from File…" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+                <Button Grid.Column="1" Style="{StaticResource SidebarActionButtonStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon FontFamily="Segoe Fluent Icons" FontSize="14" Glyph="&#xE712;" />
+                        <TextBlock Grid.Column="1" Margin="8,0" Text="More" />
+                        <FontIcon Grid.Column="2" FontFamily="Segoe Fluent Icons" FontSize="11" Glyph="&#xE70D;" />
+                    </Grid>
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Click="ViewLogMenuItem_Click" Text="View Log…" />
+                            <MenuFlyoutItem Click="ExportAllProfilesMenuItem_Click" Text="Export Tunnels to Zip…" />
                             <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Click="AboutMenuItem_Click" Text="About WireRoute" />
+                            <MenuFlyoutItem Click="DeleteSelectedProfileMenuItem_Click" Text="Delete Selected" />
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
@@ -228,62 +248,75 @@
             </Grid>
 
             <ScrollViewer x:Name="ProfileDetailPanel" Visibility="Collapsed">
-                <StackPanel MaxWidth="880" HorizontalAlignment="Center" Spacing="18">
-                    <Grid ColumnSpacing="20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="5">
-                            <TextBlock
-                                x:Name="ProfileNameText"
-                                FontFamily="Segoe UI Variable Display"
-                                FontSize="28"
-                                FontWeight="SemiBold" />
-                            <TextBlock
-                                x:Name="ProfileStorageStatusText"
-                                Foreground="{StaticResource NordicSecondaryTextBrush}"
-                                Text="Imported locally for review • Not saved to the manager" />
-                        </StackPanel>
-                        <Button
-                            x:Name="ProfileConnectButton"
-                            Grid.Column="1"
-                            MinWidth="116"
-                            Click="ProfileConnectButton_Click"
-                            IsEnabled="False"
-                            Content="Connect"
-                            Style="{StaticResource NordicAccentButtonStyle}"
-                            ToolTipService.ToolTip="Connect is enabled after the versioned manager protocol is available." />
-                    </Grid>
+                <StackPanel MaxWidth="900" HorizontalAlignment="Center" Spacing="16">
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="22">
+                        <StackPanel Spacing="18">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="48" Height="48" BorderBrush="{StaticResource NordicAccentBrush}" BorderThickness="3" CornerRadius="24">
+                                    <FontIcon HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource NordicAccentBrush}" FontSize="22" Glyph="&#xE909;" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock x:Name="ProfileNameText" FontFamily="Segoe UI Variable Display" FontSize="26" FontWeight="Bold" />
+                                    <TextBlock x:Name="ProfileStorageStatusText" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="13" />
+                                </StackPanel>
+                                <Button x:Name="ProfileConnectButton" Grid.Column="2" MinWidth="126" Click="ProfileConnectButton_Click" Content="Activate" Style="{StaticResource NordicAccentButtonStyle}">
+                                    <Button.ContentTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon FontFamily="Segoe Fluent Icons" FontSize="15" Glyph="&#xE768;" />
+                                                <TextBlock Text="{Binding}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </Button.ContentTemplate>
+                                </Button>
+                                <Button Grid.Column="3" Click="ProfileEditButton_Click" Content="Edit" />
+                            </Grid>
 
-                    <Border
-                        Background="{StaticResource NordicInsetBrush}"
-                        BorderBrush="{StaticResource NordicBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="14">
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Foreground="{StaticResource NordicAccentBrush}" Glyph="&#xE946;" />
-                            <TextBlock
-                                Grid.Column="1"
-                                Foreground="{StaticResource NordicSecondaryTextBrush}"
-                                Text="Private and preshared keys were validated but are never rendered in this view. This preview exists only for the current app session."
-                                TextWrapping="Wrap" />
-                        </Grid>
+                            <Grid ColumnSpacing="18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="330" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="7">
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="Traffic routing" />
+                                    <TextBlock x:Name="ProfileRoutingHelpText" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Grid Grid.Column="1" Height="36" Background="{StaticResource NordicRaisedBrush}" CornerRadius="6" ColumnSpacing="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ProfileSplitButton" HorizontalAlignment="Stretch" Click="ProfileSplitButton_Click" Content="Split" />
+                                    <Button x:Name="ProfileFullButton" Grid.Column="1" HorizontalAlignment="Stretch" Click="ProfileFullButton_Click" Content="Full" />
+                                </Grid>
+                            </Grid>
+
+                            <Grid ColumnSpacing="18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="DNS Protection" />
+                                    <TextBlock x:Name="ProfileDnsHelpText" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Click="ProfileDnsProtectionButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <FontIcon FontFamily="Segoe Fluent Icons" FontSize="14" Glyph="&#xEA18;" />
+                                        <TextBlock x:Name="ProfileDnsModeText" Text="Profile DNS" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
                     </Border>
 
-                    <Border
-                        x:Name="HooksWarningBorder"
-                        Background="{StaticResource NordicRaisedBrush}"
-                        BorderBrush="{StaticResource NordicAccentBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="14"
-                        Visibility="Collapsed">
+                    <Border x:Name="HooksWarningBorder" Background="{StaticResource NordicRaisedBrush}" BorderBrush="{StaticResource NordicAccentBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Visibility="Collapsed">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -291,83 +324,97 @@
                             </Grid.ColumnDefinitions>
                             <FontIcon Foreground="{StaticResource NordicAccentBrush}" Glyph="&#xE7BA;" />
                             <StackPanel Grid.Column="1" Spacing="3">
-                                <TextBlock FontWeight="SemiBold" Text="Configuration hooks detected" />
-                                <TextBlock
-                                    Foreground="{StaticResource NordicSecondaryTextBrush}"
-                                    FontSize="12"
-                                    Text="PreUp, PostUp, PreDown, or PostDown commands will not run during preview and require explicit review before manager import."
-                                    TextWrapping="Wrap" />
+                                <TextBlock FontWeight="SemiBold" Text="Configuration hooks require review" />
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="PreUp, PostUp, PreDown, and PostDown commands are blocked from service-free activation until removed." TextWrapping="Wrap" />
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <Grid ColumnSpacing="18">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource NordicCardStyle}">
-                            <StackPanel Spacing="12">
-                                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Connection" />
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="ENDPOINTS" />
-                                    <TextBlock x:Name="ProfileEndpointText" TextWrapping="Wrap" />
-                                </StackPanel>
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="INTERFACE ADDRESSES" />
-                                    <TextBlock x:Name="ProfileAddressesText" TextWrapping="Wrap" />
-                                </StackPanel>
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="PEERS" />
-                                    <TextBlock x:Name="ProfilePeersText" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Column="1" Style="{StaticResource NordicCardStyle}">
-                            <StackPanel Spacing="12">
-                                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Routing" />
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="DETECTED MODE" />
-                                    <TextBlock x:Name="ProfileRoutingModeText" />
-                                </StackPanel>
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="IMPORTED ROUTES" />
-                                    <TextBlock x:Name="ProfileRoutesText" MaxHeight="120" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <Border Style="{StaticResource NordicCardStyle}">
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="18">
                         <StackPanel Spacing="12">
-                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="DNS Protection" />
-                            <Grid ColumnSpacing="24">
+                            <Grid>
+                                <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Activity" />
+                                <Button HorizontalAlignment="Right" Click="ProfileHistoryButton_Click" Content="History…" />
+                            </Grid>
+                            <Grid ColumnSpacing="28">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="DNS SERVERS" />
-                                    <TextBlock x:Name="ProfileDnsServersText" TextWrapping="Wrap" />
+                                <StackPanel Spacing="3">
+                                    <TextBlock Foreground="{StaticResource NordicAccentBrush}" FontSize="11" FontWeight="SemiBold" Text="Download" />
+                                    <TextBlock x:Name="ProfileDownloadText" FontSize="15" FontWeight="SemiBold" Text="Zero KB/s" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Foreground="{StaticResource NordicTertiaryTextBrush}" FontSize="11" Text="SEARCH DOMAINS" />
-                                    <TextBlock x:Name="ProfileDnsSearchText" TextWrapping="Wrap" />
+                                <StackPanel Grid.Column="1" Spacing="3">
+                                    <TextBlock Foreground="#19D3D1" FontSize="11" FontWeight="SemiBold" Text="Upload" />
+                                    <TextBlock x:Name="ProfileUploadText" FontSize="15" FontWeight="SemiBold" Text="Zero KB/s" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="3">
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" FontWeight="SemiBold" Text="Session total" />
+                                    <TextBlock x:Name="ProfileSessionTotalText" FontSize="15" FontWeight="SemiBold" Text="—" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Spacing="3">
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" FontWeight="SemiBold" Text="Last handshake" />
+                                    <TextBlock x:Name="ProfileHandshakeText" FontSize="15" FontWeight="SemiBold" Text="—" />
                                 </StackPanel>
                             </Grid>
+                            <Grid Height="82">
+                                <Rectangle Height="1" VerticalAlignment="Top" Fill="{StaticResource NordicBorderBrush}" />
+                                <Rectangle Height="1" VerticalAlignment="Center" Fill="{StaticResource NordicBorderBrush}" />
+                                <Rectangle Height="1" VerticalAlignment="Bottom" Fill="{StaticResource NordicBorderBrush}" />
+                                <TextBlock x:Name="ProfileActivityText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Connect this profile to begin recording traffic." />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="18">
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" Text="● Download" />
+                                <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="11" Text="● Upload" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource NordicCardStyle}">
-                        <StackPanel Spacing="7">
-                            <TextBlock FontFamily="Segoe UI Variable Display" FontSize="17" FontWeight="SemiBold" Text="Activity" />
-                            <TextBlock
-                                x:Name="ProfileActivityText"
-                                Foreground="{StaticResource NordicSecondaryTextBrush}"
-                                Text="No activity yet. This imported preview has not been connected."
-                                TextWrapping="Wrap" />
-                        </StackPanel>
+                    <TextBlock Margin="4,4,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="14" FontWeight="SemiBold" Text="Configuration details" />
+                    <Border Style="{StaticResource NordicCardStyle}" Padding="24">
+                        <Grid RowSpacing="10" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock HorizontalAlignment="Right" FontWeight="SemiBold" Text="Interface:" />
+                            <TextBlock Grid.Column="1" x:Name="ProfileInterfaceNameText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="1" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Public key:" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ProfilePublicKeyText" FontFamily="Cascadia Mono" FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Addresses:" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="ProfileAddressesText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="3" HorizontalAlignment="Right" FontWeight="SemiBold" Text="DNS servers:" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ProfileDnsServersText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="4" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Peer:" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="ProfilePeerPublicKeyText" FontFamily="Cascadia Mono" FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="5" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Endpoint:" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ProfileEndpointText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="6" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Allowed IPs:" />
+                            <TextBlock Grid.Row="6" Grid.Column="1" x:Name="ProfileRoutesText" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="7" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Persistent keepalive:" />
+                            <TextBlock Grid.Row="7" Grid.Column="1" x:Name="ProfileKeepaliveText" />
+                            <TextBlock Grid.Row="8" HorizontalAlignment="Right" FontWeight="SemiBold" Text="On-Demand:" />
+                            <TextBlock Grid.Row="8" Grid.Column="1" x:Name="ProfileOnDemandText" Text="Off" />
+                            <TextBlock Grid.Row="9" HorizontalAlignment="Right" FontWeight="SemiBold" Text="Search domains:" />
+                            <TextBlock Grid.Row="9" Grid.Column="1" x:Name="ProfileDnsSearchText" TextWrapping="Wrap" />
+                            <TextBlock x:Name="ProfilePeersText" Visibility="Collapsed" />
+                            <TextBlock x:Name="ProfileRoutingModeText" Visibility="Collapsed" />
+                        </Grid>
                     </Border>
                 </StackPanel>
             </ScrollViewer>

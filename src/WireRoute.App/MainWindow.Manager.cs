@@ -147,14 +147,17 @@ public sealed partial class MainWindow
 
     private void SetProfileManagerControls(ProfileNavigationItem item)
     {
-        ProfileStorageStatusText.Text = item.IsManaged
-            ? "Saved securely by the WireRoute tunnel manager"
-            : item.IsStoredLocally
-                ? "Saved securely on this PC with Windows DPAPI"
-                : "Imported locally for review • Not saved";
+        ToolTipService.SetToolTip(
+            ProfileStorageStatusText,
+            item.IsManaged
+                ? "Saved securely by the WireRoute tunnel manager"
+                : item.IsStoredLocally
+                    ? "Saved securely on this PC with Windows DPAPI"
+                    : "Imported locally for review");
         if (item.IsStoredLocally && !item.IsManaged)
         {
             item.UpdateState(localTunnelController.GetState(item.Name));
+            ProfileStorageStatusText.Text = item.Status;
             ProfileConnectButton.IsEnabled = localTunnelController.IsAvailable
                 && item.LocalTunnelState is LocalTunnelState.Inactive or LocalTunnelState.Active;
             ProfileConnectButton.Content = item.LocalTunnelState switch
@@ -168,6 +171,8 @@ public sealed partial class MainWindow
                 "Activate with WireGuardNT. Windows asks for approval only when starting or stopping this tunnel.");
             return;
         }
+
+        ProfileStorageStatusText.Text = item.Status;
 
         var canChangeState = item.ManagerState == ManagerTunnelState.Started
             ? managerCapabilities?.CanStopTunnels == true

@@ -6,6 +6,39 @@ namespace WireRoute.Core.Tests;
 [TestClass]
 public sealed class WireGuardConfigParserTests
 {
+    [TestMethod]
+    public void FormatterRoundTripsSecretsRoutesDnsAndHooks()
+    {
+        var source = $$"""
+            [Interface]
+            PrivateKey = {{PrivateKey}}
+            Address = 10.20.0.2/32
+            DNS = 10.20.0.1, corp.example
+            MTU = 1380
+            PostUp = echo ready
+
+            [Peer]
+            PublicKey = {{PublicKey}}
+            PresharedKey = {{SecondPublicKey}}
+            AllowedIPs = 10.20.0.0/24
+            Endpoint = vpn.example:51820
+            PersistentKeepalive = 25
+            """;
+        var parsed = WireGuardConfigParser.Parse(source, "Laptop");
+
+        var formatted = WireGuardConfigFormatter.ToWgQuick(parsed);
+        var reparsed = WireGuardConfigParser.Parse(formatted, "Laptop");
+
+        Assert.AreEqual(parsed.Interface.Addresses.Single(), reparsed.Interface.Addresses.Single());
+        Assert.AreEqual("10.20.0.1", reparsed.Interface.DnsServers.Single());
+        Assert.AreEqual("corp.example", reparsed.Interface.DnsSearchDomains.Single());
+        Assert.IsTrue(reparsed.Interface.HasHooks);
+        Assert.IsTrue(reparsed.Peers.Single().HasPresharedKey);
+        Assert.AreEqual("10.20.0.0/24", reparsed.Peers.Single().AllowedIps.Single().Notation);
+        Assert.AreEqual("vpn.example:51820", reparsed.Peers.Single().Endpoint?.DisplayValue);
+        Assert.AreEqual((ushort)25, reparsed.Peers.Single().PersistentKeepalive);
+    }
+
     private static readonly string PrivateKey = Key(1);
     private static readonly string PublicKey = Key(33);
     private static readonly string SecondPublicKey = Key(65);

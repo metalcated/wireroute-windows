@@ -290,6 +290,9 @@ public sealed partial class MainWindow : Window
 
         ProfileNameText.Text = item.Name;
         SetProfileManagerControls(item);
+        ProfileInterfaceNameText.Text = item.Name;
+        ProfilePublicKeyText.Text = "Calculated by WireGuardNT";
+        ProfilePeerPublicKeyText.Text = DisplayList(profile.Peers.Select(peer => peer.PublicKey));
         ProfileEndpointText.Text = DisplayList(
             profile.Peers
                 .Select(peer => peer.Endpoint?.DisplayValue)
@@ -301,10 +304,58 @@ public sealed partial class MainWindow : Window
             ? "Full routing"
             : "Split routing";
         ProfileRoutesText.Text = DisplayList(profile.ImportedAllowedIps.Select(route => route.Notation));
-        ProfileDnsServersText.Text = DisplayList(profile.DnsRouteSummary.Servers.Select(server =>
-            $"{server.Address} — {(server.Route == DnsServerRoute.ThroughTunnel ? "Through tunnel" : "Outside tunnel")}"));
+        ProfileDnsServersText.Text = DisplayList(
+            profile.DnsRouteSummary.Servers.Select(server => server.Address));
         ProfileDnsSearchText.Text = DisplayList(profile.Interface.DnsSearchDomains);
+        ProfileKeepaliveText.Text = DisplayList(profile.Peers.Select(peer =>
+            peer.PersistentKeepalive is null or 0
+                ? "Off"
+                : "every " + peer.PersistentKeepalive.Value + " seconds"));
+        ProfileOnDemandText.Text = item.StoredProfile is null
+            ? "Off"
+            : item.StoredProfile.OnDemandEthernet || item.StoredProfile.OnDemandWiFi
+                ? string.Join(", ", new[]
+                {
+                    item.StoredProfile.OnDemandEthernet ? "Ethernet" : null,
+                    item.StoredProfile.OnDemandWiFi ? "Wi-Fi" : null,
+                }.Where(value => value is not null))
+                : "Off";
+        UpdateProfilePolicyControls(item, profile);
         HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateProfilePolicyControls(
+        ProfileNavigationItem item,
+        WireGuardProfile profile)
+    {
+        var isFull = item.StoredProfile?.RouteMode == StoredTunnelRouteMode.Full
+            || item.StoredProfile is null
+            && profile.DetectedRouteMode == TunnelRouteMode.Full;
+        SetRouteSegmentState(isFull);
+        ProfileRoutingHelpText.Text = isFull
+            ? "Full tunnel sends all supported traffic through the VPN and blocks an unsupported address family."
+            : "Split tunnel sends only the selected networks through the VPN.";
+        var encryptedDns =
+            item.StoredProfile?.DnsProtectionMode == StoredDnsProtectionMode.Encrypted;
+        ProfileDnsModeText.Text = encryptedDns
+            ? item.StoredProfile?.DnsProvider ?? "Encrypted DNS"
+            : "Profile DNS";
+        ProfileDnsHelpText.Text = encryptedDns
+            ? "Use " + item.StoredProfile?.DnsResolverUrl + " while connected."
+            : "Use the DNS servers saved in this WireGuard profile.";
+        ProfileActivityText.Text = item.IsActive
+            ? "Traffic metrics update while the tunnel is active."
+            : "Connect this profile to begin recording traffic.";
+    }
+
+    private void SetRouteSegmentState(bool isFull)
+    {
+        ProfileFullButton.Background = isFull
+            ? (Brush)Application.Current.Resources["NordicAccentBrush"]
+            : (Brush)Application.Current.Resources["NordicRaisedBrush"];
+        ProfileSplitButton.Background = isFull
+            ? (Brush)Application.Current.Resources["NordicRaisedBrush"]
+            : (Brush)Application.Current.Resources["NordicAccentBrush"];
     }
 
     private void ShowManagerProfile(ProfileNavigationItem item, ManagerProfileDetail profile)
@@ -318,6 +369,9 @@ public sealed partial class MainWindow : Window
 
         ProfileNameText.Text = item.Name;
         SetProfileManagerControls(item);
+        ProfileInterfaceNameText.Text = item.Name;
+        ProfilePublicKeyText.Text = "Managed by the installed tunnel service";
+        ProfilePeerPublicKeyText.Text = DisplayList(profile.Peers.Select(peer => peer.PublicKey));
         ProfileEndpointText.Text = DisplayList(profile.Peers.Select(peer => peer.Endpoint).Where(value => value is not null).Select(value => value!));
         ProfileAddressesText.Text = DisplayList(profile.InterfaceAddresses);
         ProfilePeersText.Text = profile.Peers.Count == 1 ? "1 peer" : $"{profile.Peers.Count} peers";
@@ -325,9 +379,22 @@ public sealed partial class MainWindow : Window
             ? "Full routing"
             : "Split routing";
         ProfileRoutesText.Text = DisplayList(profile.Peers.SelectMany(peer => peer.AllowedIps));
-        ProfileDnsServersText.Text = DisplayList(profile.DnsServers.Select(server =>
-            $"{server.Address} — {(server.Route == DnsServerRoute.ThroughTunnel ? "Through tunnel" : "Outside tunnel")}"));
+        ProfileDnsServersText.Text = DisplayList(profile.DnsServers.Select(server => server.Address));
         ProfileDnsSearchText.Text = DisplayList(profile.DnsSearchDomains);
+        ProfileKeepaliveText.Text = DisplayList(profile.Peers.Select(peer =>
+            peer.PersistentKeepalive is null or 0
+                ? "Off"
+                : "every " + peer.PersistentKeepalive.Value + " seconds"));
+        ProfileOnDemandText.Text = "Off";
+        SetRouteSegmentState(profile.DetectedRouteMode == TunnelRouteMode.Full);
+        ProfileRoutingHelpText.Text = profile.DetectedRouteMode == TunnelRouteMode.Full
+            ? "Full tunnel sends all supported traffic through the VPN."
+            : "Split tunnel sends only the configured networks through the VPN.";
+        ProfileDnsModeText.Text = "Profile DNS";
+        ProfileDnsHelpText.Text = "Use the DNS servers saved in this WireGuard profile.";
+        ProfileActivityText.Text = item.IsActive
+            ? "Traffic metrics update while the tunnel is active."
+            : "Connect this profile to begin recording traffic.";
         HooksWarningBorder.Visibility = profile.HasHooks ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -372,7 +439,13 @@ public sealed partial class MainWindow : Window
             Text = message,
             TextWrapping = TextWrapping.Wrap,
         };
-        await CreateDialog(title, content).ShowAsync();
+        await ShowModalAsync(new ModalRequest
+        {
+            Title = title,
+            Content = content,
+            CancelText = "Done",
+            MaxWidth = 640,
+        });
     }
 
     private ContentDialog CreateDialog(string title, object content) => new()
@@ -408,8 +481,14 @@ public sealed partial class MainWindow : Window
             TextWrapping = TextWrapping.Wrap,
         });
 
-        var dialog = CreateDialog("About WireRoute", content);
-        await dialog.ShowAsync();
+        await ShowModalAsync(new ModalRequest
+        {
+            Title = "About WireRoute",
+            IconGlyph = "\uE946",
+            Content = content,
+            CancelText = "Done",
+            MaxWidth = 620,
+        });
     }
 
     private TrayMenuSnapshot CreateTrayMenuSnapshot()
@@ -496,19 +575,20 @@ public sealed partial class MainWindow : Window
         if (Profiles.Any(profile => profile.IsActive))
         {
             RestoreWindowFromTray();
-            var confirmation = CreateDialog(
-                "Quit WireRoute?",
-                new TextBlock
+            var result = await ShowModalAsync(new ModalRequest
+            {
+                Title = "Quit WireRoute?",
+                Content = new TextBlock
                 {
                     MaxWidth = 560,
                     Text = "The active tunnel will remain connected after WireRoute quits.",
                     TextWrapping = TextWrapping.Wrap,
-                });
-            confirmation.PrimaryButtonText = "Quit WireRoute";
-            confirmation.PrimaryButtonStyle = (Style)Application.Current.Resources["NordicAccentButtonStyle"];
-            confirmation.CloseButtonText = "Cancel";
-            confirmation.CloseButtonStyle = null;
-            if (await confirmation.ShowAsync() != ContentDialogResult.Primary)
+                },
+                PrimaryText = "Quit WireRoute",
+                CancelText = "Cancel",
+                MaxWidth = 620,
+            });
+            if (result != WireRouteModalResult.Primary)
             {
                 return;
             }
