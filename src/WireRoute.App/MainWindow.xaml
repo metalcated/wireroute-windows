@@ -649,12 +649,44 @@
                                     <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" Text="Default follows Windows automatically. Contrast variants remain fixed." TextAlignment="Right" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="SettingsTrayIconPicker" Grid.Column="1" HorizontalAlignment="Stretch">
-                                    <ComboBoxItem Content="Default" />
-                                    <ComboBoxItem Content="WireRoute Color" />
-                                    <ComboBoxItem Content="Clear Outline" />
-                                    <ComboBoxItem Content="Dark" />
-                                    <ComboBoxItem Content="Light" />
-                                    <ComboBoxItem Content="Legacy WireGuard" />
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:TrayIconChoice">
+                                            <Grid Height="28" ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="22" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Canvas Width="22" Height="22" VerticalAlignment="Center">
+                                                    <Ellipse
+                                                        Canvas.Left="1.55"
+                                                        Canvas.Top="1.55"
+                                                        Width="18.9"
+                                                        Height="18.9"
+                                                        Stroke="{x:Bind AccentBrush}"
+                                                        StrokeThickness="1.4"
+                                                        Visibility="{x:Bind LegacyRingVisibility}" />
+                                                    <Path
+                                                        Data="M 4.62,4.62 L 11,18.04 L 17.38,4.62"
+                                                        Stroke="{x:Bind PrimaryBrush}"
+                                                        StrokeEndLineCap="Round"
+                                                        StrokeLineJoin="Round"
+                                                        StrokeStartLineCap="Round"
+                                                        StrokeThickness="2.25" />
+                                                    <Ellipse Canvas.Left="2.7" Canvas.Top="2.7" Width="3.85" Height="3.85" Fill="{StaticResource NordicSurfaceBrush}" Stroke="{x:Bind PrimaryBrush}" StrokeThickness="1.55" />
+                                                    <Ellipse Canvas.Left="9.08" Canvas.Top="16.12" Width="3.85" Height="3.85" Fill="{StaticResource NordicSurfaceBrush}" Stroke="{x:Bind PrimaryBrush}" StrokeThickness="1.55" />
+                                                    <Ellipse Canvas.Left="15.46" Canvas.Top="2.7" Width="3.85" Height="3.85" Fill="{StaticResource NordicSurfaceBrush}" Stroke="{x:Bind PrimaryBrush}" StrokeThickness="1.55" />
+                                                    <Ellipse Canvas.Left="4.62" Canvas.Top="8.47" Width="12.76" Height="5.61" Stroke="{x:Bind AccentBrush}" StrokeThickness="1.5" />
+                                                    <Path
+                                                        Data="M 11,14.08 L 13.37,15.02 L 12.98,17.33 L 11,19.03 L 9.02,17.33 L 8.63,15.02 Z"
+                                                        Fill="{x:Bind ShieldBrush}"
+                                                        Stroke="{x:Bind PrimaryBrush}"
+                                                        StrokeLineJoin="Round"
+                                                        StrokeThickness="1.05" />
+                                                </Canvas>
+                                                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{x:Bind Name}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </Grid>
                         </StackPanel>

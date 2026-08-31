@@ -3,6 +3,7 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using WireRoute.App.Models;
 using WireRoute.Core.Routing;
 using WireRoute.Storage;
 
@@ -12,6 +13,55 @@ public sealed partial class MainWindow
 {
     private readonly WireRouteSettingsStore settingsStore = new();
     private WireRouteAppSettings appSettings = WireRouteAppSettings.Defaults;
+
+    private void InitializeAppearancePickers()
+    {
+        SettingsTrayIconPicker.ItemsSource = new[]
+        {
+            TrayIconChoice(
+                "Default",
+                ColorHelper.FromArgb(255, 245, 248, 252),
+                ColorHelper.FromArgb(255, 0, 204, 238)),
+            TrayIconChoice(
+                "WireRoute Color",
+                ColorHelper.FromArgb(255, 20, 126, 255),
+                ColorHelper.FromArgb(255, 0, 214, 255)),
+            TrayIconChoice(
+                "Clear Outline",
+                ColorHelper.FromArgb(255, 245, 248, 252),
+                ColorHelper.FromArgb(255, 245, 248, 252),
+                hasShieldFill: false),
+            TrayIconChoice(
+                "Dark",
+                ColorHelper.FromArgb(255, 0, 0, 0),
+                ColorHelper.FromArgb(255, 0, 0, 0)),
+            TrayIconChoice(
+                "Light",
+                ColorHelper.FromArgb(255, 255, 255, 255),
+                ColorHelper.FromArgb(255, 255, 255, 255)),
+            TrayIconChoice(
+                "Legacy WireGuard",
+                ColorHelper.FromArgb(255, 225, 225, 225),
+                ColorHelper.FromArgb(255, 202, 202, 202),
+                isLegacy: true),
+        };
+    }
+
+    private static TrayIconChoice TrayIconChoice(
+        string name,
+        Windows.UI.Color primary,
+        Windows.UI.Color accent,
+        bool hasShieldFill = true,
+        bool isLegacy = false)
+    {
+        var primaryBrush = new SolidColorBrush(primary);
+        return new TrayIconChoice(
+            name,
+            primaryBrush,
+            new SolidColorBrush(accent),
+            hasShieldFill ? primaryBrush : new SolidColorBrush(Colors.Transparent),
+            isLegacy ? Visibility.Visible : Visibility.Collapsed);
+    }
 
     private async Task LoadSettingsAsync()
     {
@@ -192,16 +242,22 @@ public sealed partial class MainWindow
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static string SelectedComboText(ComboBox comboBox, string fallback) =>
-        (comboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? fallback;
+        ComboItemText(comboBox.SelectedItem) ?? fallback;
 
     private static void SelectComboItem(ComboBox comboBox, string value)
     {
         comboBox.SelectedItem = comboBox.Items
-            .OfType<ComboBoxItem>()
-            .FirstOrDefault(item =>
-                item.Content?.ToString()?.Equals(
-                    value,
-                    StringComparison.OrdinalIgnoreCase) == true)
-            ?? comboBox.Items.OfType<ComboBoxItem>().FirstOrDefault();
+            .Cast<object>()
+            .FirstOrDefault(item => ComboItemText(item)?.Equals(
+                value,
+                StringComparison.OrdinalIgnoreCase) == true)
+            ?? comboBox.Items.Cast<object>().FirstOrDefault();
     }
+
+    private static string? ComboItemText(object? item) => item switch
+    {
+        TrayIconChoice choice => choice.Name,
+        ComboBoxItem comboBoxItem => comboBoxItem.Content?.ToString(),
+        _ => item?.ToString(),
+    };
 }

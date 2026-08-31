@@ -35,6 +35,43 @@
     <SolidColorBrush x:Key="WireGuardSyntaxValueBrush" Color="{StaticResource WireGuardSyntaxValueColor}" />
     <SolidColorBrush x:Key="WireGuardSyntaxNumberBrush" Color="{StaticResource WireGuardSyntaxNumberColor}" />
 
+    <StaticResource x:Key="ComboBoxBackground" ResourceKey="NordicRaisedBrush" />
+    <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="NordicSurfaceBrush" />
+    <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="NordicInsetBrush" />
+    <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="NordicRaisedBrush" />
+    <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="NordicBorderBrush" />
+    <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxForeground" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxForegroundFocused" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxForegroundFocusedPressed" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxPlaceHolderForeground" ResourceKey="NordicSecondaryTextBrush" />
+    <StaticResource x:Key="ComboBoxDropDownBackground" ResourceKey="NordicSurfaceBrush" />
+    <StaticResource x:Key="ComboBoxDropDownBorderBrush" ResourceKey="NordicBorderBrush" />
+    <StaticResource x:Key="ComboBoxDropDownForeground" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxDropDownGlyphForeground" ResourceKey="NordicSecondaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemBackground" ResourceKey="NordicSurfaceBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundPointerOver" ResourceKey="NordicRaisedBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundPressed" ResourceKey="NordicInsetBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundSelected" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundSelectedUnfocused" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundSelectedPressed" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBackgroundSelectedPointerOver" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrush" ResourceKey="NordicSurfaceBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushPointerOver" ResourceKey="NordicRaisedBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushPressed" ResourceKey="NordicInsetBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushSelected" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushSelectedUnfocused" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushSelectedPressed" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemBorderBrushSelectedPointerOver" ResourceKey="NordicAccentBrush" />
+    <StaticResource x:Key="ComboBoxItemForeground" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundPointerOver" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundPressed" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundSelected" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundSelectedUnfocused" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundSelectedPressed" ResourceKey="NordicPrimaryTextBrush" />
+    <StaticResource x:Key="ComboBoxItemForegroundSelectedPointerOver" ResourceKey="NordicPrimaryTextBrush" />
+
     <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="ButtonCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>

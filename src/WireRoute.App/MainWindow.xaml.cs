@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
         this.managerClient = managerClient;
         this.managerLaunchError = managerLaunchError;
         InitializeComponent();
+        InitializeAppearancePickers();
         Root.ActualThemeChanged += Root_ActualThemeChanged;
 
         windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
