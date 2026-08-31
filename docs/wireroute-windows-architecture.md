@@ -10,10 +10,11 @@
 
 1. The existing Go tunnel engine is preserved. WireRoute will not reimplement WireGuardNT adapter management, tunnel service installation, route application, or the encrypted configuration store in C#.
 2. `WireRoute.App` is an unprivileged WinUI 3 process with an `asInvoker` manifest. It targets native x64 and ARM64 only.
-3. The first milestone does not modify the manager service or its IPC. A versioned C#-compatible boundary will be designed after a threat review of the inherited-pipe model. The current Go `gob` protocol will not be reimplemented by assumption.
-4. The WinUI project is initially unpackaged. This allows the existing service and installer model to launch a normal executable and pass explicit handles. Release packaging remains an installer milestone.
-5. Nordic Blue is the default visual system. System appearance remains required, but it is not enabled until every control has a complete system-theme resource path.
-6. Profile secrets remain in the existing DPAPI-protected store. The UI will receive redacted data unless an explicitly authorized workflow requires private material.
+3. During the parity milestone, the privileged boundary remains the upstream automatic-start `WireGuardManager` service. This is an intentional Windows-specific exception to the macOS lifecycle and will be reassessed after functional parity; the WinUI process remains unprivileged.
+4. The manager exposes a versioned, bounded JSON protocol over inherited anonymous pipes while preserving the existing manager-created trust boundary. The current Go `gob` protocol is not reimplemented in C#.
+5. The WinUI project is initially unpackaged. This allows the existing service and installer model to launch a normal executable and pass explicit handles. Release packaging remains an installer milestone.
+6. Nordic Blue is the default visual system. System appearance remains required, but it is not enabled until every control has a complete system-theme resource path.
+7. Profile secrets remain in the existing DPAPI-protected store. The UI receives redacted profile details; private configuration material crosses the boundary only during explicitly requested import and provisioning workflows.
 
 ## Current import boundary
 

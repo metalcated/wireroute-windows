@@ -18,6 +18,17 @@ After you've built the application, run `amd64\wireguard.exe` or `x86\wireguard.
 C:\Projects\wireguard-windows> amd64\wireguard.exe
 ```
 
+## Building the WireRoute WinUI client
+
+WireRoute releases target native x64 and ARM64 only. Publish the WinUI client into the matching WireGuard output directory with the repository script:
+
+```text
+powershell -ExecutionPolicy Bypass -File scripts\Publish-WireRouteApp.ps1 -Platform x64
+powershell -ExecutionPolicy Bypass -File scripts\Publish-WireRouteApp.ps1 -Platform ARM64
+```
+
+The script stages the complete unpackaged WinUI output, including the generated `.xbf` and `.pri` resources required at runtime. Do not copy only the executable and managed assemblies; an incomplete directory will build successfully but crash before creating a window.
+
 Since WireGuard requires a driver to be installed, and this generally requires a valid Microsoft signature, you may benefit from first installing a release of WireGuard for Windows from the official [wireguard.com](https://www.wireguard.com/install/) builds, which bundles a Microsoft-signed driver, and then subsequently run your own wireguard.exe. Alternatively, you can craft your own installer using the `quickinstall.bat` script.
 
 ### Optional: Localizing

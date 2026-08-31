@@ -39,7 +39,7 @@
 
 		<MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-		<Icon Id="wireguard.ico" SourceFile="..\ui\icon\wireguard.ico" />
+		<Icon Id="wireguard.ico" SourceFile="..\ui\icon\wireroute.ico" />
 		<Binary Id="customactions.dll" SourceFile="$(var.WIREGUARD_PLATFORM)\customactions.dll" />
 
 		<Property Id="ARPPRODUCTICON" Value="wireguard.ico" />

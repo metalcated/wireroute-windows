@@ -17,6 +17,16 @@ public sealed class RouterOSParityTests
     private static readonly string ServerPublicKey = Key(65);
 
     [TestMethod]
+    [DataRow("Managed by WireRoute", true)]
+    [DataRow(" managed BY wireroute ", true)]
+    [DataRow("Site-to-site server", false)]
+    [DataRow("Manually created peer", false)]
+    [DataRow("", false)]
+    [DataRow(null, false)]
+    public void ManagedPeerVisibilityMatchesMacOs(string? comment, bool expected) =>
+        Assert.AreEqual(expected, RouterOSPeerCreation.IsWireRouteManagedComment(comment));
+
+    [TestMethod]
     public async Task DiscoveryUsesRouterOSRestEndpointsAndFlexibleValues()
     {
         var transport = new QueueTransport(

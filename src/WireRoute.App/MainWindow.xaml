@@ -456,6 +456,7 @@
                             IsEnabled="False"
                             Checked="RouterOSShowAllPeersCheckBox_Changed"
                             Content="Show all peers"
+                            ToolTipService.ToolTip="Include site-to-site and manually created peers. WireRoute clients are identified by their RouterOS comment."
                             Unchecked="RouterOSShowAllPeersCheckBox_Changed" />
                         <Button
                             x:Name="RouterOSSetUpPeerButton"

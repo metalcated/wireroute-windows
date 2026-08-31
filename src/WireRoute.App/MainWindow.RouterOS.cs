@@ -299,11 +299,6 @@ public sealed partial class MainWindow
             ? routerOSPeers
             : managedPeers;
         RouterOSDiscoveryRows.Clear();
-        foreach (var routerInterface in routerOSInterfaces)
-        {
-            RouterOSDiscoveryRows.Add(RouterOSDiscoveryRow.FromInterface(routerInterface));
-        }
-
         foreach (var peer in displayedPeers)
         {
             RouterOSDiscoveryRows.Add(RouterOSDiscoveryRow.FromPeer(peer));
@@ -315,7 +310,7 @@ public sealed partial class MainWindow
         RouterOSDiscoveryEmptyText.Text = routerOSPeers.Count == 0
             ? "No WireGuard peers were found on this router."
             : managedPeers.Length == 0 && RouterOSShowAllPeersCheckBox.IsChecked != true
-                ? "No WireRoute-managed clients were found. Select Show all peers to view other peers."
+                ? "No WireRoute-managed clients were found. Select Show all peers to view site-to-site or manually created peers."
                 : string.Empty;
         RouterOSDiscoveryEmptyText.Visibility = RouterOSDiscoveryRows.Count == 0
             || (routerOSPeers.Count > 0 && displayedPeers.Count == 0)

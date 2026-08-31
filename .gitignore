@@ -15,6 +15,7 @@
 *.syso
 .idea
 *.ico
+!/ui/icon/wireroute.ico
 
 # Visual Studio and .NET
 /.vs
