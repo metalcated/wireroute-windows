@@ -19,5 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WireRoute.Core\WireRoute.Core.csproj" />
+    <ProjectReference Include="..\WireRoute.RouterOS\WireRoute.RouterOS.csproj" />
+    <ProjectReference Include="..\WireRoute.Storage\WireRoute.Storage.csproj" />
   </ItemGroup>
 </Project>
