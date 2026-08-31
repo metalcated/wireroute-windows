@@ -72,7 +72,8 @@ public sealed partial class MainWindow
         await ShowProfileEditorAsync(
             selectedProfile,
             selectedProfile.StoredProfile.Configuration,
-            "Calculated by WireGuardNT");
+            WireGuardKeyPair.FromPrivateKey(
+                WireGuardConfigFormatter.PrivateKey(selectedProfile.Profile!)).PublicKey);
     }
 
     private async Task ShowProfileEditorAsync(
@@ -106,6 +107,13 @@ public sealed partial class MainWindow
             Text = initialConfiguration,
             TextWrapping = TextWrapping.NoWrap,
         };
+        var publicKeyText = new TextBlock
+        {
+            FontFamily = new FontFamily("Cascadia Mono"),
+            FontSize = 12,
+            Text = publicKey,
+            TextWrapping = TextWrapping.Wrap,
+        };
         var errorText = ModalErrorText();
         var excludePrivateIpsBox = new CheckBox
         {
@@ -131,6 +139,8 @@ public sealed partial class MainWindow
             try
             {
                 var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorTunnelName());
+                publicKeyText.Text = WireGuardKeyPair.FromPrivateKey(
+                    WireGuardConfigFormatter.PrivateKey(parsed)).PublicKey;
                 var state = WireGuardPrivateRouteExclusion.Evaluate(parsed);
                 updatingPrivateRouteControl = true;
                 excludePrivateIpsBox.Visibility = state.IsAvailable
@@ -141,6 +151,7 @@ public sealed partial class MainWindow
             catch (WireGuardConfigParseException)
             {
                 updatingPrivateRouteControl = true;
+                publicKeyText.Text = string.Empty;
                 excludePrivateIpsBox.Visibility = Visibility.Collapsed;
                 excludePrivateIpsBox.IsChecked = false;
             }
@@ -205,13 +216,7 @@ public sealed partial class MainWindow
             identityGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
         AddFormRow(identityGrid, 0, "Name:", nameBox);
-        AddFormRow(identityGrid, 1, "Public key:", new TextBlock
-        {
-            FontFamily = new FontFamily("Cascadia Mono"),
-            FontSize = 12,
-            Text = publicKey,
-            TextWrapping = TextWrapping.Wrap,
-        });
+        AddFormRow(identityGrid, 1, "Public key:", publicKeyText);
         var onDemand = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         onDemand.Children.Add(ethernetBox);
         onDemand.Children.Add(wifiBox);
