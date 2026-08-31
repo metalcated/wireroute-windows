@@ -11,6 +11,7 @@ public enum WireRouteActivityKind
     ProfileDeleted,
     ProfileActivated,
     ProfileDeactivated,
+    OnDemandMatched,
     TunnelError,
     RouterOSProfileCreated,
 }

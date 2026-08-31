@@ -56,6 +56,7 @@ public sealed partial class MainWindow : Window
             UpdateTrayIconAppearance();
         };
         UpdateTrayIconAppearance();
+        StartOnDemandMonitoring();
         appWindow.Closing += AppWindow_Closing;
         UpdateProfilesEmptyState();
         _ = LoadStoredProfilesAsync();
@@ -167,6 +168,7 @@ public sealed partial class MainWindow : Window
                     // Leave malformed protected entries untouched for a future recovery flow.
                 }
             }
+            await EvaluateOnDemandAsync();
 
             if (ProfilesList.SelectedItem is null && Profiles.Count > 0)
             {
