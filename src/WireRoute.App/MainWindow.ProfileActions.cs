@@ -776,8 +776,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        var entries = await LoadProfileActivityAsync(item);
-        await ShowActivityLogAsync(item.Name + " Activity", entries);
+        await ShowProfileHistoryAsync(item);
     }
 
     private async void ViewLogMenuItem_Click(object sender, RoutedEventArgs e)

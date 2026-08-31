@@ -125,7 +125,8 @@ public sealed partial class MainWindow
                 string.Join(", ", dnsServers),
                 string.Join(", ", splitRoutes),
                 keepalive,
-                SettingsPersistentServiceToggle.IsOn);
+                SettingsPersistentServiceToggle.IsOn,
+                appSettings.ActivityRetentionDays);
             var persistenceChanged = settings.PersistentTunnelService
                 != appSettings.PersistentTunnelService;
             if (persistenceChanged

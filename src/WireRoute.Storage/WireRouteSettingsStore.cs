@@ -9,7 +9,8 @@ public sealed record WireRouteAppSettings(
     string DnsServers,
     string SplitTunnelRoutes,
     int PersistentKeepalive,
-    bool PersistentTunnelService)
+    bool PersistentTunnelService,
+    int ActivityRetentionDays = 7)
 {
     public static WireRouteAppSettings Defaults { get; } = new(
         "Blue Nordic",
@@ -18,7 +19,8 @@ public sealed record WireRouteAppSettings(
         string.Empty,
         string.Empty,
         25,
-        false);
+        false,
+        7);
 }
 
 [SupportedOSPlatform("windows")]
@@ -63,6 +65,12 @@ public sealed class WireRouteSettingsStore
         {
             throw new ArgumentException(
                 "Keepalive must be between 0 and 65535 seconds.",
+                nameof(value));
+        }
+        if (value.ActivityRetentionDays is not (1 or 7 or 30))
+        {
+            throw new ArgumentException(
+                "Activity retention must be 1, 7, or 30 days.",
                 nameof(value));
         }
     }

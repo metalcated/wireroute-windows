@@ -2,6 +2,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Windows.Foundation;
 using WireRoute.App.Interop;
+using WireRoute.Storage;
 
 namespace WireRoute.App;
 
@@ -9,17 +10,20 @@ public sealed partial class MainWindow
 {
     private const int MaximumActivitySamples = 60;
     private readonly Queue<ActivityRateSample> activitySamples = new();
+    private readonly Dictionary<Guid, ActivityRecordingState> activityRecordings = new();
     private DispatcherQueueTimer? activityTimer;
     private string? activityProfileName;
     private WireGuardTunnelMetrics? previousMetrics;
     private DateTimeOffset previousMetricsAt;
+    private DateTimeOffset lastActivityPurgeAt;
+    private bool activityRefreshRunning;
 
     private void StartActivityMonitoring()
     {
         activityTimer = DispatcherQueue.CreateTimer();
         activityTimer.Interval = TimeSpan.FromSeconds(1);
         activityTimer.IsRepeating = true;
-        activityTimer.Tick += (_, _) => UpdateLiveActivity();
+        activityTimer.Tick += async (_, _) => await UpdateLiveActivityAsync();
         activityTimer.Start();
     }
 
@@ -30,7 +34,32 @@ public sealed partial class MainWindow
         ResetLiveActivity();
     }
 
-    private void UpdateLiveActivity()
+    private async Task UpdateLiveActivityAsync()
+    {
+        if (activityRefreshRunning)
+        {
+            return;
+        }
+        activityRefreshRunning = true;
+        try
+        {
+            try
+            {
+                await UpdateConnectionRecordingsAsync();
+            }
+            catch (WireRouteStorageException)
+            {
+                // Live WireGuardNT counters remain useful when optional local history is unavailable.
+            }
+            UpdateSelectedLiveActivity();
+        }
+        finally
+        {
+            activityRefreshRunning = false;
+        }
+    }
+
+    private void UpdateSelectedLiveActivity()
     {
         var item = selectedProfile;
         if (item is null || !item.IsActive)
@@ -93,6 +122,105 @@ public sealed partial class MainWindow
             _ = activitySamples.Dequeue();
         }
         UpdateActivityChart();
+    }
+
+    private async Task UpdateConnectionRecordingsAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var activeProfileIds = new HashSet<Guid>();
+        foreach (var item in Profiles.Where(profile =>
+            profile.StoredProfile is not null && profile.IsActive))
+        {
+            var profile = item.StoredProfile!;
+            activeProfileIds.Add(profile.Id);
+            if (!localTunnelController.TryReadMetrics(profile, out var metrics, out _)
+                || metrics is null)
+            {
+                continue;
+            }
+
+            if (!activityRecordings.TryGetValue(profile.Id, out var recording))
+            {
+                recording = new ActivityRecordingState(
+                    await activityStore.BeginConnectionSessionAsync(
+                        profile.Id,
+                        item.Name,
+                        now,
+                        managerCancellation.Token),
+                    metrics.ReceivedBytes,
+                    metrics.SentBytes,
+                    metrics.ReceivedBytes,
+                    metrics.SentBytes,
+                    metrics.LastHandshake,
+                    now);
+                activityRecordings.Add(profile.Id, recording);
+            }
+            else
+            {
+                recording.Add(metrics);
+            }
+
+            if (now - recording.LastPersistedAt >= TimeSpan.FromSeconds(5))
+            {
+                await PersistConnectionRecordingAsync(profile.Id, recording, now);
+            }
+        }
+
+        foreach (var profileId in activityRecordings.Keys
+            .Where(profileId => !activeProfileIds.Contains(profileId))
+            .ToArray())
+        {
+            await EndConnectionRecordingAsync(profileId, now);
+        }
+
+        if (lastActivityPurgeAt == default
+            || now - lastActivityPurgeAt >= TimeSpan.FromHours(1))
+        {
+            await activityStore.PurgeConnectionSessionsAsync(
+                now.AddDays(-appSettings.ActivityRetentionDays),
+                managerCancellation.Token);
+            lastActivityPurgeAt = now;
+        }
+    }
+
+    private async Task PersistConnectionRecordingAsync(
+        Guid profileId,
+        ActivityRecordingState recording,
+        DateTimeOffset now)
+    {
+        await activityStore.UpdateConnectionSessionAsync(
+            recording.SessionId,
+            profileId,
+            now,
+            recording.ReceivedBytes,
+            recording.SentBytes,
+            recording.LastHandshake,
+            managerCancellation.Token);
+        recording.LastPersistedAt = now;
+    }
+
+    private async Task EndConnectionRecordingAsync(Guid profileId, DateTimeOffset now)
+    {
+        if (!activityRecordings.Remove(profileId, out var recording))
+        {
+            return;
+        }
+        await activityStore.EndConnectionSessionAsync(
+            recording.SessionId,
+            now,
+            recording.ReceivedBytes,
+            recording.SentBytes,
+            recording.LastHandshake,
+            managerCancellation.Token);
+    }
+
+    private async Task EndAllConnectionRecordingsAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var profileId in activityRecordings.Keys.ToArray())
+        {
+            await EndConnectionRecordingAsync(profileId, now);
+        }
     }
 
     private void ResetLiveActivity()
@@ -169,4 +297,51 @@ public sealed partial class MainWindow
     }
 
     private readonly record struct ActivityRateSample(double Download, double Upload);
+
+    private sealed class ActivityRecordingState(
+        Guid sessionId,
+        ulong previousReceivedBytes,
+        ulong previousSentBytes,
+        ulong receivedBytes,
+        ulong sentBytes,
+        DateTimeOffset? lastHandshake,
+        DateTimeOffset lastPersistedAt)
+    {
+        public Guid SessionId { get; } = sessionId;
+
+        public ulong PreviousReceivedBytes { get; private set; } = previousReceivedBytes;
+
+        public ulong PreviousSentBytes { get; private set; } = previousSentBytes;
+
+        public ulong ReceivedBytes { get; private set; } = receivedBytes;
+
+        public ulong SentBytes { get; private set; } = sentBytes;
+
+        public DateTimeOffset? LastHandshake { get; private set; } = lastHandshake;
+
+        public DateTimeOffset LastPersistedAt { get; set; } = lastPersistedAt;
+
+        public void Add(WireGuardTunnelMetrics metrics)
+        {
+            ReceivedBytes = SaturatingAdd(
+                ReceivedBytes,
+                CounterDelta(metrics.ReceivedBytes, PreviousReceivedBytes));
+            SentBytes = SaturatingAdd(
+                SentBytes,
+                CounterDelta(metrics.SentBytes, PreviousSentBytes));
+            PreviousReceivedBytes = metrics.ReceivedBytes;
+            PreviousSentBytes = metrics.SentBytes;
+            if (metrics.LastHandshake is not null
+                && (LastHandshake is null || metrics.LastHandshake > LastHandshake))
+            {
+                LastHandshake = metrics.LastHandshake;
+            }
+        }
+
+        private static ulong CounterDelta(ulong current, ulong previous) =>
+            current >= previous ? current - previous : current;
+
+        private static ulong SaturatingAdd(ulong first, ulong second) =>
+            ulong.MaxValue - first < second ? ulong.MaxValue : first + second;
+    }
 }

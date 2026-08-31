@@ -437,6 +437,14 @@ public sealed partial class MainWindow
     private async void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         StopActivityMonitoring();
+        try
+        {
+            await EndAllConnectionRecordingsAsync();
+        }
+        catch (WireRouteStorageException)
+        {
+            // Shutdown must continue if optional local history cannot be finalized.
+        }
         StopOnDemandMonitoring();
         trayIcon.Dispose();
         managerCancellation.Cancel();

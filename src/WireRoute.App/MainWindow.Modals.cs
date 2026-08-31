@@ -26,6 +26,7 @@ public sealed partial class MainWindow
         var titleRow = new Grid { ColumnSpacing = 14 };
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         if (!string.IsNullOrWhiteSpace(request.IconGlyph))
         {
             var icon = new Border
@@ -56,6 +57,16 @@ public sealed partial class MainWindow
         };
         Grid.SetColumn(title, 1);
         titleRow.Children.Add(title);
+        Button? headerActionButton = null;
+        if (!string.IsNullOrWhiteSpace(request.HeaderActionText))
+        {
+            headerActionButton = CreateModalButton(request.HeaderActionText!, isPrimary: false);
+            headerActionButton.MinHeight = 34;
+            headerActionButton.Padding = new Thickness(14, 6, 14, 6);
+            headerActionButton.VerticalAlignment = VerticalAlignment.Top;
+            Grid.SetColumn(headerActionButton, 2);
+            titleRow.Children.Add(headerActionButton);
+        }
         header.Children.Add(titleRow);
         if (!string.IsNullOrWhiteSpace(request.Subtitle))
         {
@@ -125,6 +136,9 @@ public sealed partial class MainWindow
         ModalHeaderPresenter.Content = header;
         ModalContentPresenter.Content = request.Content;
         ModalFooterPresenter.Content = footer;
+        ModalFooterPresenter.Visibility = footer.Children.Count == 0
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         void UpdateModalSize()
         {
             var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
@@ -150,6 +164,7 @@ public sealed partial class MainWindow
             ModalHeaderPresenter.Content = null;
             ModalContentPresenter.Content = null;
             ModalFooterPresenter.Content = null;
+            ModalFooterPresenter.Visibility = Visibility.Visible;
             Root.SizeChanged -= resizeHandler;
             request.DetachButtons();
             activeModal = null;
@@ -199,6 +214,11 @@ public sealed partial class MainWindow
         {
             cancelButton.Click += async (_, _) =>
                 await InvokeAsync(WireRouteModalResult.Cancel, request.OnCancel);
+        }
+
+        if (headerActionButton is not null)
+        {
+            headerActionButton.Click += (_, _) => Finish(WireRouteModalResult.Cancel);
         }
 
         if (secondaryButton is not null)
@@ -268,6 +288,8 @@ public sealed partial class MainWindow
         public string? Subtitle { get; init; }
 
         public string? IconGlyph { get; init; }
+
+        public string? HeaderActionText { get; init; }
 
         public required FrameworkElement Content { get; init; }
 

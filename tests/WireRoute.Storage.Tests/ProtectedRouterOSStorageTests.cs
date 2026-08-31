@@ -28,6 +28,7 @@ public sealed class ProtectedRouterOSStorageTests
 
         Assert.IsNotNull(settings);
         Assert.IsFalse(settings.PersistentTunnelService);
+        Assert.AreEqual(7, settings.ActivityRetentionDays);
     }
 
     [TestMethod]
@@ -197,6 +198,63 @@ public sealed class ProtectedRouterOSStorageTests
             var protectedText = Encoding.UTF8.GetString(
                 await File.ReadAllBytesAsync(Path.Combine(directory, "activity.dpapi")));
             Assert.IsFalse(protectedText.Contains("Tunnel failure details", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task ActivityStoreTracksAndClearsCompletedConnectionSessions()
+    {
+        var directory = NewStorageDirectory();
+        try
+        {
+            var store = new WireRouteActivityStore(directory);
+            var profileId = Guid.NewGuid();
+            var startedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+            var completedId = await store.BeginConnectionSessionAsync(
+                profileId,
+                "Laptop",
+                startedAt);
+            await store.UpdateConnectionSessionAsync(
+                completedId,
+                profileId,
+                startedAt.AddMinutes(1),
+                4096,
+                2048,
+                startedAt.AddSeconds(45));
+            await store.EndConnectionSessionAsync(
+                completedId,
+                startedAt.AddMinutes(1),
+                4096,
+                2048,
+                startedAt.AddSeconds(45));
+            var activeId = await store.BeginConnectionSessionAsync(
+                profileId,
+                "Laptop",
+                DateTimeOffset.UtcNow);
+
+            var sessions = await store.LoadConnectionSessionsAsync(profileId);
+            Assert.AreEqual(2, sessions.Count);
+            Assert.AreEqual(activeId, sessions[0].Id);
+            Assert.AreEqual(4096UL, sessions[1].ReceivedBytes);
+            Assert.AreEqual(2048UL, sessions[1].SentBytes);
+            Assert.IsNotNull(sessions[1].EndedAt);
+
+            await store.ClearCompletedConnectionSessionsAsync(profileId);
+
+            sessions = await store.LoadConnectionSessionsAsync(profileId);
+            Assert.AreEqual(1, sessions.Count);
+            Assert.AreEqual(activeId, sessions[0].Id);
+            Assert.IsNull(sessions[0].EndedAt);
+            var protectedText = Encoding.UTF8.GetString(
+                await File.ReadAllBytesAsync(Path.Combine(directory, "activity-sessions.dpapi")));
+            Assert.IsFalse(protectedText.Contains("Laptop", StringComparison.Ordinal));
         }
         finally
         {
