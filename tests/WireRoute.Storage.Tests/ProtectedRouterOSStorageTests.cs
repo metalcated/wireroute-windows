@@ -69,12 +69,59 @@ public sealed class ProtectedRouterOSStorageTests
             Assert.AreEqual(1, loaded.Count);
             Assert.AreEqual(profile.Id, loaded[0].Id);
             Assert.AreEqual(profile.Name, loaded[0].Name);
+            Assert.AreEqual("Laptop", loaded[0].TunnelName);
+            Assert.AreEqual("Laptop", loaded[0].ServiceName);
             Assert.AreEqual(profile.Configuration, loaded[0].Configuration);
             CollectionAssert.AreEqual(profile.SplitRoutes.ToArray(), loaded[0].SplitRoutes.ToArray());
             var protectedBytes = await File.ReadAllBytesAsync(
                 Path.Combine(directory, "wireguard-profiles.dpapi"));
             var protectedText = System.Text.Encoding.UTF8.GetString(protectedBytes);
             Assert.IsFalse(protectedText.Contains("sensitive-material", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task ProfileStoreSeparatesFriendlyNameFromStableTunnelName()
+    {
+        var directory = NewStorageDirectory();
+        try
+        {
+            var store = new WireGuardProfileStore(directory);
+            var now = DateTimeOffset.UtcNow;
+            var id = Guid.Parse("dff129a9-1da4-4ae9-bfa3-f38846ca1b85");
+            var profile = new WireRouteStoredProfile(
+                id,
+                "iPhone 12 Dev",
+                "[Interface]\nPrivateKey = sensitive-material",
+                StoredTunnelRouteMode.Full,
+                Array.Empty<string>(),
+                StoredDnsProtectionMode.Profile,
+                null,
+                null,
+                Array.Empty<string>(),
+                false,
+                false,
+                now,
+                now);
+
+            Assert.AreEqual("iPhone-12-Dev-dff129a91da4", profile.TunnelName);
+            await store.SaveAsync(profile);
+            var loaded = (await store.LoadAllAsync()).Single();
+            Assert.AreEqual("iPhone 12 Dev", loaded.Name);
+            Assert.AreEqual("iPhone-12-Dev-dff129a91da4", loaded.TunnelName);
+
+            var renamed = loaded with { Name = "Travel Phone" };
+            await store.SaveAsync(renamed);
+            Assert.AreEqual(
+                "iPhone-12-Dev-dff129a91da4",
+                (await store.LoadAllAsync()).Single().TunnelName);
         }
         finally
         {

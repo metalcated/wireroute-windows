@@ -80,6 +80,8 @@ public sealed partial class MainWindow
         string initialConfiguration,
         string publicKey)
     {
+        var editorProfileId = item?.StoredProfile?.Id ?? Guid.NewGuid();
+        var editorTunnelName = item?.StoredProfile?.TunnelName;
         var nameBox = new TextBox
         {
             Text = item?.Name ?? string.Empty,
@@ -113,12 +115,10 @@ public sealed partial class MainWindow
         IReadOnlyList<string>? dnsServersAddedToAllowedIps = null;
         var updatingPrivateRouteControl = false;
 
-        string EditorProfileName()
+        string EditorTunnelName()
         {
-            var proposedName = nameBox.Text.Trim();
-            return WireGuardConfigParser.IsValidProfileName(proposedName)
-                ? proposedName
-                : item?.Name ?? "WireRoute";
+            return editorTunnelName
+                ?? WireRouteStoredProfile.CreateTunnelName(nameBox.Text.Trim(), editorProfileId);
         }
 
         void UpdatePrivateRouteControl()
@@ -130,7 +130,7 @@ public sealed partial class MainWindow
 
             try
             {
-                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorProfileName());
+                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorTunnelName());
                 var state = WireGuardPrivateRouteExclusion.Evaluate(parsed);
                 updatingPrivateRouteControl = true;
                 excludePrivateIpsBox.Visibility = state.IsAvailable
@@ -152,7 +152,7 @@ public sealed partial class MainWindow
 
         try
         {
-            var initialProfile = WireGuardConfigParser.Parse(initialConfiguration, EditorProfileName());
+            var initialProfile = WireGuardConfigParser.Parse(initialConfiguration, EditorTunnelName());
             var initialState = WireGuardPrivateRouteExclusion.Evaluate(initialProfile);
             if (initialState.IsEnabled)
             {
@@ -173,7 +173,7 @@ public sealed partial class MainWindow
 
             try
             {
-                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorProfileName());
+                var parsed = WireGuardConfigParser.Parse(configurationBox.Text, EditorTunnelName());
                 var enable = excludePrivateIpsBox.IsChecked == true;
                 updatingPrivateRouteControl = true;
                 configurationBox.Text = WireGuardPrivateRouteExclusion.SetEnabled(
@@ -246,7 +246,10 @@ public sealed partial class MainWindow
                 {
                     var name = nameBox.Text.Trim();
                     var configuration = configurationBox.Text.Trim() + Environment.NewLine;
-                    var parsed = WireGuardConfigParser.Parse(configuration, name);
+                    var existing = item?.StoredProfile;
+                    var tunnelName = existing?.TunnelName
+                        ?? WireRouteStoredProfile.CreateTunnelName(name, editorProfileId);
+                    var parsed = WireGuardConfigParser.Parse(configuration, tunnelName);
                     if (excludePrivateIpsBox.IsChecked == true
                         && dnsServersAddedToAllowedIps is not null
                         && parsed.Peers.Count == 1)
@@ -254,12 +257,11 @@ public sealed partial class MainWindow
                         configuration = WireGuardPrivateRouteExclusion.RefreshDnsRoutes(
                             parsed,
                             dnsServersAddedToAllowedIps);
-                        parsed = WireGuardConfigParser.Parse(configuration, name);
+                        parsed = WireGuardConfigParser.Parse(configuration, tunnelName);
                     }
-                    var existing = item?.StoredProfile;
                     var now = DateTimeOffset.UtcNow;
                     var stored = new WireRouteStoredProfile(
-                        existing?.Id ?? Guid.NewGuid(),
+                        editorProfileId,
                         name,
                         configuration,
                         parsed.DetectedRouteMode == TunnelRouteMode.Full
@@ -273,7 +275,10 @@ public sealed partial class MainWindow
                         ethernetBox.IsChecked == true,
                         wifiBox.IsChecked == true,
                         existing?.CreatedAt ?? now,
-                        now);
+                        now)
+                    {
+                        ServiceName = tunnelName,
+                    };
                     await profileStore.SaveAsync(stored, managerCancellation.Token);
                     if (item is null)
                     {
@@ -444,7 +449,9 @@ public sealed partial class MainWindow
         IReadOnlyList<RoutePrefix> routes)
     {
         var configuration = WireGuardConfigFormatter.ToWgQuick(item.Profile!, routes);
-        var parsed = WireGuardConfigParser.Parse(configuration, item.Name);
+        var parsed = WireGuardConfigParser.Parse(
+            configuration,
+            item.StoredProfile!.TunnelName);
         var stored = item.StoredProfile! with
         {
             Configuration = configuration,
@@ -682,7 +689,9 @@ public sealed partial class MainWindow
                             dnsServers: dns);
                         if (WireGuardPrivateRouteExclusion.Evaluate(item.Profile).IsEnabled)
                         {
-                            var parsedDnsChange = WireGuardConfigParser.Parse(configuration, item.Name);
+                            var parsedDnsChange = WireGuardConfigParser.Parse(
+                                configuration,
+                                item.StoredProfile!.TunnelName);
                             configuration = WireGuardPrivateRouteExclusion.RefreshDnsRoutes(
                                 parsedDnsChange,
                                 item.Profile.Interface.DnsServers);
@@ -715,7 +724,9 @@ public sealed partial class MainWindow
                         DnsBootstrapAddresses = bootstrap,
                         UpdatedAt = DateTimeOffset.UtcNow,
                     };
-                    var parsed = WireGuardConfigParser.Parse(configuration, item.Name);
+                    var parsed = WireGuardConfigParser.Parse(
+                        configuration,
+                        item.StoredProfile!.TunnelName);
                     await profileStore.SaveAsync(updated, managerCancellation.Token);
                     item.UpdateStoredProfile(updated, parsed);
                     await RecordActivityAsync(

@@ -87,7 +87,7 @@ public sealed partial class MainWindow
             var candidate = Profiles.FirstOrDefault(profile =>
                 profile.StoredProfile is not null
                 && !profile.IsManaged
-                && localTunnelController.GetState(profile.Name) == LocalTunnelState.Inactive
+                && localTunnelController.GetState(profile.StoredProfile.TunnelName) == LocalTunnelState.Inactive
                 && MatchesCurrentNetwork(profile));
             if (candidate is null)
             {

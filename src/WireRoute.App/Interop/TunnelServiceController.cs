@@ -105,7 +105,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             profile,
             cancellationToken);
         var operationDirectory = RuntimeDirectory(profile);
-        var configurationPath = Path.Combine(operationDirectory, profile.Name + ".conf");
+        var configurationPath = Path.Combine(operationDirectory, profile.TunnelName + ".conf");
         var metricsPath = Path.Combine(operationDirectory, "tunnel.metrics");
         var logPath = Path.Combine(operationDirectory, "tunnel.log");
         Directory.CreateDirectory(operationDirectory);
@@ -137,7 +137,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         {
             if (profile.DnsProtectionMode == StoredDnsProtectionMode.Encrypted)
             {
-                await dnsProxy.StopAsync(profile.Name);
+                await dnsProxy.StopAsync(profile.TunnelName);
             }
             TryDelete(metricsPath);
             TryDeleteDirectory(operationDirectory);
@@ -155,9 +155,9 @@ internal sealed class TunnelServiceController : IAsyncDisposable
     {
         await RunElevatedAsync(
             "/stopephemeraltunnelservice",
-            profile.Name,
+            profile.TunnelName,
             cancellationToken);
-        await dnsProxy.StopAsync(profile.Name);
+        await dnsProxy.StopAsync(profile.TunnelName);
         var operationDirectory = RuntimeDirectory(profile);
         TryDelete(Path.Combine(operationDirectory, "tunnel.metrics"));
         TryDeleteDirectory(operationDirectory);
@@ -252,7 +252,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
             error = exception.Message;
         }
 
-        if (WireGuardRuntimeMetrics.TryRead(profile.Name, out metrics, out var adapterError))
+        if (WireGuardRuntimeMetrics.TryRead(profile.TunnelName, out metrics, out var adapterError))
         {
             error = null;
             return true;
@@ -272,7 +272,7 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (profile.DnsProtectionMode != StoredDnsProtectionMode.Encrypted
-            || GetState(profile.Name) != LocalTunnelState.Active)
+            || GetState(profile.TunnelName) != LocalTunnelState.Active)
         {
             return;
         }
@@ -320,11 +320,11 @@ internal sealed class TunnelServiceController : IAsyncDisposable
         }
 
         await dnsProxy.StartAsync(
-            profile.Name,
+            profile.TunnelName,
             resolver,
             bootstrap,
             cancellationToken);
-        var parsed = WireGuardConfigParser.Parse(profile.Configuration, profile.Name);
+        var parsed = WireGuardConfigParser.Parse(profile.Configuration, profile.TunnelName);
         return WireGuardConfigFormatter.ToWgQuick(
             parsed,
             dnsServers: new[] { IPAddress.Loopback.ToString() });

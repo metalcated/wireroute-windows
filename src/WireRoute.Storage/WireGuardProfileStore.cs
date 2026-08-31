@@ -1,5 +1,8 @@
 using System.Globalization;
 using System.Runtime.Versioning;
+using System.Text;
+using System.Text.Json.Serialization;
+using WireRoute.Core.Profiles;
 
 namespace WireRoute.Storage;
 
@@ -28,7 +31,63 @@ public sealed record WireRouteStoredProfile(
     bool OnDemandEthernet,
     bool OnDemandWiFi,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public string? ServiceName { get; init; }
+
+    [JsonIgnore]
+    public string TunnelName =>
+        WireGuardConfigParser.IsValidProfileName(ServiceName ?? string.Empty)
+            ? ServiceName!
+            : CreateTunnelName(Name, Id);
+
+    public static string CreateTunnelName(string displayName, Guid id)
+    {
+        if (WireGuardConfigParser.IsValidProfileName(displayName))
+        {
+            return displayName;
+        }
+
+        var rendered = new StringBuilder();
+        foreach (var character in displayName.Normalize(NormalizationForm.FormKC))
+        {
+            var allowed = character is >= 'a' and <= 'z'
+                or >= 'A' and <= 'Z'
+                or >= '0' and <= '9'
+                or '_' or '=' or '+' or '.' or '-';
+            if (allowed)
+            {
+                rendered.Append(character);
+            }
+            else if (rendered.Length == 0 || rendered[^1] != '-')
+            {
+                rendered.Append('-');
+            }
+        }
+
+        var stem = rendered.ToString().Trim('-', '.');
+        if (stem.Length == 0)
+        {
+            stem = "WireRoute";
+        }
+        const int suffixLength = 12;
+        var suffix = id.ToString("N")[..suffixLength];
+        var maximumStemLength = 32 - suffixLength - 1;
+        if (stem.Length > maximumStemLength)
+        {
+            stem = stem[..maximumStemLength].TrimEnd('-', '.');
+        }
+        if (stem.Length == 0)
+        {
+            stem = "WireRoute";
+        }
+
+        var candidate = stem + "-" + suffix;
+        return WireGuardConfigParser.IsValidProfileName(candidate)
+            ? candidate
+            : "WireRoute-" + suffix;
+    }
+}
 
 [SupportedOSPlatform("windows")]
 public sealed class WireGuardProfileStore
@@ -53,6 +112,7 @@ public sealed class WireGuardProfileStore
         WireRouteStoredProfile profile,
         CancellationToken cancellationToken = default)
     {
+        profile = profile with { ServiceName = profile.TunnelName };
         Validate(profile);
         _ = await profiles.UpdateAsync(current =>
         {
@@ -112,6 +172,11 @@ public sealed class WireGuardProfileStore
         if (string.IsNullOrWhiteSpace(profile.Configuration))
         {
             throw new ArgumentException("A WireGuard configuration is required.", nameof(profile));
+        }
+
+        if (!WireGuardConfigParser.IsValidProfileName(profile.TunnelName))
+        {
+            throw new ArgumentException("The internal WireGuard tunnel name is invalid.", nameof(profile));
         }
 
         if (profile.SplitRoutes is null || profile.DnsBootstrapAddresses is null)

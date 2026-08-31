@@ -157,7 +157,7 @@ public sealed partial class MainWindow
                     : "Imported locally for review");
         if (item.IsStoredLocally && !item.IsManaged)
         {
-            item.UpdateState(localTunnelController.GetState(item.Name));
+            item.UpdateState(localTunnelController.GetState(item.StoredProfile!.TunnelName));
             ProfileStorageStatusText.Text = item.Status;
             ProfileConnectButton.IsEnabled = localTunnelController.IsAvailable
                 && item.LocalTunnelState is LocalTunnelState.Inactive or LocalTunnelState.Active;
@@ -218,7 +218,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        var wasActive = localTunnelController.GetState(item.Name) == LocalTunnelState.Active;
+        var wasActive = localTunnelController.GetState(item.StoredProfile.TunnelName) == LocalTunnelState.Active;
         if (!wasActive && item.Profile?.Interface.HasHooks == true)
         {
             const string message =
@@ -244,7 +244,7 @@ public sealed partial class MainWindow
             {
                 await localTunnelController.StartAsync(item.StoredProfile, managerCancellation.Token);
             }
-            item.UpdateState(localTunnelController.GetState(item.Name));
+            item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
             await RecordActivityAsync(
                 wasActive
                     ? WireRouteActivityKind.ProfileDeactivated
@@ -256,7 +256,7 @@ public sealed partial class MainWindow
         }
         catch (OperationCanceledException exception)
         {
-            item.UpdateState(localTunnelController.GetState(item.Name));
+            item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
             await RecordActivityAsync(
                 WireRouteActivityKind.TunnelError,
                 item,
@@ -266,7 +266,7 @@ public sealed partial class MainWindow
         }
         catch (Exception exception)
         {
-            item.UpdateState(localTunnelController.GetState(item.Name));
+            item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
             await RecordActivityAsync(
                 WireRouteActivityKind.TunnelError,
                 item,
@@ -348,10 +348,12 @@ public sealed partial class MainWindow
     {
         if (managerClient is null || managerCapabilities?.CanImportProfiles != true)
         {
-            var localProfile = WireGuardConfigParser.Parse(wgQuickConfiguration, displayName);
+            var profileId = Guid.NewGuid();
+            var tunnelName = WireRouteStoredProfile.CreateTunnelName(displayName, profileId);
+            var localProfile = WireGuardConfigParser.Parse(wgQuickConfiguration, tunnelName);
             var now = DateTimeOffset.UtcNow;
             var storedProfile = new WireRouteStoredProfile(
-                Guid.NewGuid(),
+                profileId,
                 displayName,
                 wgQuickConfiguration,
                 localProfile.DetectedRouteMode == TunnelRouteMode.Full
@@ -365,7 +367,10 @@ public sealed partial class MainWindow
                 OnDemandEthernet: false,
                 OnDemandWiFi: false,
                 now,
-                now);
+                now)
+            {
+                ServiceName = tunnelName,
+            };
             await profileStore.SaveAsync(storedProfile, managerCancellation.Token);
             var localItem = new ProfileNavigationItem(storedProfile, localProfile);
             Profiles.Add(localItem);

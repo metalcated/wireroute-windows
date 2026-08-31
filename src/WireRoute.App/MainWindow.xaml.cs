@@ -146,9 +146,9 @@ public sealed partial class MainWindow : Window
             {
                 try
                 {
-                    var profile = WireGuardConfigParser.Parse(storedProfile.Configuration, storedProfile.Name);
+                    var profile = WireGuardConfigParser.Parse(storedProfile.Configuration, storedProfile.TunnelName);
                     var item = new ProfileNavigationItem(storedProfile, profile);
-                    item.UpdateState(localTunnelController.GetState(item.Name));
+                    item.UpdateState(localTunnelController.GetState(storedProfile.TunnelName));
                     Profiles.Add(item);
                     if (item.IsActive
                         && storedProfile.DnsProtectionMode == StoredDnsProtectionMode.Encrypted)
@@ -297,10 +297,12 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            var profile = WireGuardConfigParser.Parse(configuration, profileName);
+            var profileId = Guid.NewGuid();
+            var tunnelName = WireRouteStoredProfile.CreateTunnelName(profileName, profileId);
+            var profile = WireGuardConfigParser.Parse(configuration, tunnelName);
             var now = DateTimeOffset.UtcNow;
             var storedProfile = new WireRouteStoredProfile(
-                Guid.NewGuid(),
+                profileId,
                 profileName,
                 configuration,
                 profile.DetectedRouteMode == TunnelRouteMode.Full
@@ -314,7 +316,10 @@ public sealed partial class MainWindow : Window
                 OnDemandEthernet: false,
                 OnDemandWiFi: false,
                 now,
-                now);
+                now)
+            {
+                ServiceName = tunnelName,
+            };
             await profileStore.SaveAsync(storedProfile);
             var item = new ProfileNavigationItem(storedProfile, profile);
             Profiles.Add(item);
@@ -613,7 +618,7 @@ public sealed partial class MainWindow : Window
         var availableProfiles = Profiles.Where(profile => profile.IsManaged || profile.IsStoredLocally).ToArray();
         foreach (var profile in availableProfiles.Where(profile => profile.IsStoredLocally && !profile.IsManaged))
         {
-            profile.UpdateState(localTunnelController.GetState(profile.Name));
+            profile.UpdateState(localTunnelController.GetState(profile.StoredProfile!.TunnelName));
         }
 
         var status = availableProfiles.Any(profile =>
