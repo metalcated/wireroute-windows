@@ -18,8 +18,13 @@ internal sealed class TrayIcon : IDisposable
     private const uint NotifyIconShowTip = 0x00000080;
     private const uint ImageIcon = 1;
     private const uint LoadFromFile = 0x00000010;
+    private const int LargeIconWidth = 11;
+    private const int LargeIconHeight = 12;
     private const int SmallIconWidth = 49;
     private const int SmallIconHeight = 50;
+    private const uint SetIconMessage = 0x0080;
+    private const int SetSmallIcon = 0;
+    private const int SetLargeIcon = 1;
     private const int LeftButtonUp = 0x0202;
     private const int LeftButtonDoubleClick = 0x0203;
     private const int RightButtonUp = 0x0205;
@@ -30,8 +35,11 @@ internal sealed class TrayIcon : IDisposable
     private readonly Action activateWindow;
     private readonly WindowProcedure windowProcedure;
     private readonly nint previousWindowProcedure;
+    private readonly nint previousSmallIcon;
+    private readonly nint previousLargeIcon;
     private readonly uint taskbarCreatedMessage;
     private nint iconHandle;
+    private nint largeIconHandle;
     private bool isAdded;
     private bool isDisposed;
 
@@ -53,6 +61,21 @@ internal sealed class TrayIcon : IDisposable
             throw new Win32Exception(Marshal.GetLastWin32Error(), "WireRoute could not load its notification icon.");
         }
 
+        largeIconHandle = LoadImage(
+            0,
+            iconPath,
+            ImageIcon,
+            GetSystemMetrics(LargeIconWidth),
+            GetSystemMetrics(LargeIconHeight),
+            LoadFromFile);
+        if (largeIconHandle == 0)
+        {
+            var error = Marshal.GetLastWin32Error();
+            DestroyIcon(iconHandle);
+            iconHandle = 0;
+            throw new Win32Exception(error, "WireRoute could not load its window icon.");
+        }
+
         windowProcedure = ProcessWindowMessage;
         previousWindowProcedure = SetWindowLongPtr(
             windowHandle,
@@ -61,11 +84,15 @@ internal sealed class TrayIcon : IDisposable
         if (previousWindowProcedure == 0)
         {
             var error = Marshal.GetLastWin32Error();
+            DestroyIcon(largeIconHandle);
+            largeIconHandle = 0;
             DestroyIcon(iconHandle);
             iconHandle = 0;
             throw new Win32Exception(error, "WireRoute could not register its notification icon window.");
         }
 
+        previousSmallIcon = SendMessage(windowHandle, SetIconMessage, SetSmallIcon, iconHandle);
+        previousLargeIcon = SendMessage(windowHandle, SetIconMessage, SetLargeIcon, largeIconHandle);
         taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
         try
         {
@@ -73,7 +100,11 @@ internal sealed class TrayIcon : IDisposable
         }
         catch
         {
+            SendMessage(windowHandle, SetIconMessage, SetSmallIcon, previousSmallIcon);
+            SendMessage(windowHandle, SetIconMessage, SetLargeIcon, previousLargeIcon);
             SetWindowLongPtr(windowHandle, WindowProcedureIndex, previousWindowProcedure);
+            DestroyIcon(largeIconHandle);
+            largeIconHandle = 0;
             DestroyIcon(iconHandle);
             iconHandle = 0;
             throw;
@@ -153,7 +184,15 @@ internal sealed class TrayIcon : IDisposable
             isAdded = false;
         }
 
+        SendMessage(windowHandle, SetIconMessage, SetSmallIcon, previousSmallIcon);
+        SendMessage(windowHandle, SetIconMessage, SetLargeIcon, previousLargeIcon);
         SetWindowLongPtr(windowHandle, WindowProcedureIndex, previousWindowProcedure);
+        if (largeIconHandle != 0)
+        {
+            DestroyIcon(largeIconHandle);
+            largeIconHandle = 0;
+        }
+
         if (iconHandle != 0)
         {
             DestroyIcon(iconHandle);
@@ -222,6 +261,9 @@ internal sealed class TrayIcon : IDisposable
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern nint SendMessage(nint window, uint message, nint wParam, nint lParam);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
