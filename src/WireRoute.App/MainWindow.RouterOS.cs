@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using WireRoute.App.Models;
 using WireRoute.RouterOS;
@@ -328,6 +329,31 @@ public sealed partial class MainWindow
 
     private void RouterOSDiscoveryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         UpdateRouterOSRecoveryAction();
+
+    private void RouterOSDiscoveryList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is RouterOSDiscoveryRow row)
+        {
+            RouterOSDiscoveryList.SelectedItem = row;
+        }
+    }
+
+    private void RouterOSDiscoveryList_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        DependencyObject? current = e.OriginalSource as DependencyObject;
+        while (current is not null)
+        {
+            if (current is FrameworkElement element
+                && element.DataContext is RouterOSDiscoveryRow row)
+            {
+                RouterOSDiscoveryList.SelectedItem = row;
+                return;
+            }
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        RouterOSDiscoveryList.SelectedItem = null;
+    }
 
     private void RouterOSShowAllPeersCheckBox_Changed(object sender, RoutedEventArgs e)
     {

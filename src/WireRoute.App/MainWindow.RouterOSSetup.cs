@@ -84,6 +84,89 @@ public sealed partial class MainWindow
         Profiles.FirstOrDefault(value =>
             value.InterfacePublicKey?.Equals(peer.PublicKey, StringComparison.Ordinal) == true);
 
+    private RouterOSWireGuardPeer? SelectedRouterOSPeer() =>
+        (RouterOSDiscoveryList.SelectedItem as RouterOSDiscoveryRow)?.Peer;
+
+    private void RouterOSPeerContextFlyout_Opening(object sender, object e)
+    {
+        UpdateRouterOSRecoveryAction();
+        var peer = SelectedRouterOSPeer();
+        var profile = peer is null ? null : ProfileMatchingRouterOSPeer(peer);
+        var hasLocalConfiguration = profile?.StoredProfile is not null && profile.Profile is not null;
+
+        RouterOSPeerOpenMenuItem.IsEnabled = profile is not null;
+        RouterOSPeerQrMenuItem.IsEnabled = hasLocalConfiguration;
+        RouterOSPeerExportMenuItem.IsEnabled = hasLocalConfiguration;
+        RouterOSPeerCopyPublicKeyMenuItem.IsEnabled = peer is not null;
+        RouterOSPeerCopyPrivateKeyMenuItem.IsEnabled = hasLocalConfiguration;
+        RouterOSPeerRecoveryMenuItem.Text = RouterOSRecoverProfileButton.Content?.ToString()
+            ?? "Recover Missing Profile…";
+        RouterOSPeerRecoveryMenuItem.IsEnabled = RouterOSRecoverProfileButton.IsEnabled;
+    }
+
+    private async void RouterOSPeerContextOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRouterOSPeer() is not { } peer
+            || ProfileMatchingRouterOSPeer(peer) is not { } profile)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(ProfilesList.SelectedItem, profile))
+        {
+            selectedProfile = profile;
+            await ShowProfileAsync(profile);
+        }
+        else
+        {
+            ProfilesList.SelectedItem = profile;
+        }
+    }
+
+    private void RouterOSPeerContextQr_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRouterOSPeer() is { } peer
+            && ProfileMatchingRouterOSPeer(peer) is { } profile)
+        {
+            selectedProfile = profile;
+            ProfileContextQr_Click(sender, e);
+        }
+    }
+
+    private void RouterOSPeerContextExport_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRouterOSPeer() is { } peer
+            && ProfileMatchingRouterOSPeer(peer) is { } profile)
+        {
+            selectedProfile = profile;
+            ProfileContextExportSelected_Click(sender, e);
+        }
+    }
+
+    private async void RouterOSPeerContextCopyPublicKey_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRouterOSPeer() is { } peer)
+        {
+            await CopySensitiveTextAsync(
+                peer.PublicKey,
+                "Peer public key copied",
+                "The RouterOS peer public key is on the clipboard.");
+        }
+    }
+
+    private void RouterOSPeerContextCopyPrivateKey_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRouterOSPeer() is { } peer
+            && ProfileMatchingRouterOSPeer(peer) is { } profile)
+        {
+            selectedProfile = profile;
+            ProfileContextCopyPrivateKey_Click(sender, e);
+        }
+    }
+
+    private void RouterOSPeerContextRecovery_Click(object sender, RoutedEventArgs e) =>
+        RouterOSRecoverProfileButton_Click(sender, e);
+
     private async void RouterOSRecoverProfileButton_Click(object sender, RoutedEventArgs e)
     {
         if (routerOSConnectedContext is not { } context

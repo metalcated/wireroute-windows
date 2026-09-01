@@ -589,21 +589,59 @@
                                 Grid.Row="1"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                IsItemClickEnabled="False"
+                                IsItemClickEnabled="True"
+                                ItemClick="RouterOSDiscoveryList_ItemClick"
                                 ItemsSource="{x:Bind RouterOSDiscoveryRows}"
+                                RightTapped="RouterOSDiscoveryList_RightTapped"
                                 SelectionChanged="RouterOSDiscoveryList_SelectionChanged"
                                 SelectionMode="Single">
+                                <ListView.ContextFlyout>
+                                    <MenuFlyout Opening="RouterOSPeerContextFlyout_Opening">
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerOpenMenuItem"
+                                            Click="RouterOSPeerContextOpen_Click"
+                                            Text="Open in WireRoute" />
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerQrMenuItem"
+                                            Click="RouterOSPeerContextQr_Click"
+                                            Text="Show Configuration QR Code…" />
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerExportMenuItem"
+                                            Click="RouterOSPeerContextExport_Click"
+                                            Text="Export Profile to Zip…" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerCopyPublicKeyMenuItem"
+                                            Click="RouterOSPeerContextCopyPublicKey_Click"
+                                            Text="Copy Peer Public Key" />
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerCopyPrivateKeyMenuItem"
+                                            Click="RouterOSPeerContextCopyPrivateKey_Click"
+                                            Text="Copy Client Private Key…" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem
+                                            x:Name="RouterOSPeerRecoveryMenuItem"
+                                            Click="RouterOSPeerContextRecovery_Click"
+                                            Text="Recover Missing Profile…" />
+                                    </MenuFlyout>
+                                </ListView.ContextFlyout>
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="UseSystemFocusVisuals" Value="True" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="models:RouterOSDiscoveryRow">
                                         <Grid Padding="10,8" ColumnSpacing="14">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="1.3*" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="1" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{x:Bind Detail}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Foreground="{StaticResource NordicSecondaryTextBrush}" Text="{x:Bind Status}" TextTrimming="CharacterEllipsis" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>
