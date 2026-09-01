@@ -1,113 +1,98 @@
-# Enterprise Usage
+# Enterprise deployment
 
-WireGuard for Windows has been designed from the ground-up to make full use of standard Windows service, ACL, and CLI capabilities, making WireGuard deployable in enterprise scenarios or as part of Active Directory domains.
+WireRoute is packaged as a standard per-machine MSI for Windows 11 x64 and ARM64. The supported product path is the unprivileged WinUI application plus demand-start per-tunnel WireGuard services. The inherited automatic `WireGuardManager` service is not part of the standard deployment.
 
-### Installation
+## Installation
 
-While consumer users are generally directed toward [wireguard-installer.exe](https://download.wireguard.com/windows-client/wireguard-installer.exe), this installer simply takes care of selecting the correct MSI for the architecture, validating signatures, and executing it. Enterprise admins can instead [download MSIs directly](https://download.wireguard.com/windows-client/) and deploy these using [Group Policy Objects](https://docs.microsoft.com/en-us/troubleshoot/windows-server/group-policy/use-group-policy-to-install-software). The installer makes use of standard MSI features and should be easily automatable. The additional MSI property of `DO_NOT_LAUNCH` suppresses launching WireGuard after its installation, should that be required.
-
-### Tunnel Service versus Manager Service and UI
-
-The "manager service" is responsible for displaying a UI on select users' desktops (in the system tray), and responding to requests from the UI to do things like add, remove, start, or stop tunnels. The "tunnel service" is a separate Windows service for each tunnel. These two services may be used together, or separately, as described below. The various commands below will log errors and status to standard error, or, if standard error does not exist, to standard output.
-
-### Tunnel Service
-
-A tunnel service may be installed or uninstalled using the commands:
+Choose the MSI that matches the device architecture:
 
 ```text
-> wireguard /installtunnelservice C:\path\to\some\myconfname.conf
-> wireguard /uninstalltunnelservice myconfname
+WireRoute-x64-<version>.msi
+WireRoute-ARM64-<version>.msi
 ```
 
-This creates a service called `WireGuardTunnel$myconfname`, which can be controlled using standard Windows service management utilites, such as `services.msc` or [`sc`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-query).
+A quiet installation can use standard Windows Installer options:
 
-If the configuration filename ends in `.conf`, it is interpreted as a normal [`wg-quick(8)`](https://git.zx2c4.com/wireguard-tools/about/src/man/wg-quick.8) configuration file. If it ends in `.conf.dpapi`, it is considered to be that same configuration file, but encrypted using [`CryptProtectData(bytes, "myconfname")`](https://docs.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata).
+```powershell
+msiexec.exe /i WireRoute-x64-1.0.0.msi /qn /norestart
+```
 
-The tunnel service may be queried and modified at runtime using the standard [`wg(8)`](https://git.zx2c4.com/wireguard-tools/about/src/man/wg.8) command line utility. If the configuration file is a `.conf.dpapi` one, then Local System or Administrator permissions is required to interact with it using `wg(8)`; otherwise users of `wg(8)` must have Local System or Administrator permissions, or permissions the same as the owner of the `.conf` file. Invocation of `wg(8)` follows usual patterns on other platforms. For example:
+A quiet uninstall can use the deployed MSI or its product code:
+
+```powershell
+msiexec.exe /x WireRoute-x64-1.0.0.msi /qn /norestart
+```
+
+The package installs under Program Files and creates a Start menu shortcut. It does not automatically launch WireRoute and currently defines no product-specific MSI policy properties. Same-version upgrades are allowed; downgrades are blocked. x64 and ARM64 packages have separate upgrade identities, so deploy only the native package for each device.
+
+Verify the Authenticode signature and published SHA-256 value before enterprise deployment. See [Downloads](../DOWNLOADS.md) and [Code-signing policy](../CODE_SIGNING_POLICY.md).
+
+## User data and uninstall behavior
+
+Each signed-in user has independent state under:
 
 ```text
-> wg show myconfname
-interface: myconfname
-  public key: lfTRXEWxt8mZc8cjSvOWN3tqnTpWw4v2Eg3qF6WTklw=
-  private key: (hidden)
-  listening port: 53488
-
-peer: JRI8Xc0zKP9kXk8qP84NdUQA04h6DLfFbwJn4g+/PFs=
-  endpoint: 163.172.161.0:12912
-  allowed ips: 0.0.0.0/0
-  latest handshake: 3 seconds ago
-  transfer: 6.55 KiB received, 4.13 KiB sent
+%LOCALAPPDATA%\WireRoute
 ```
 
-The `PreUp`, `PostUp`, `PreDown`, and `PostDown` configuration options may be specified to run custom commands at various points in the lifetime of a tunnel service, but only if the correct registry key is set. [See `adminregistry.md` for information.](adminregistry.md)
+Profiles, settings, RouterOS connections and passwords, certificate pins, recovery records, activity events, and connection sessions are protected with current-user Windows DPAPI. The MSI uninstall removes installed program files and shortcuts; it does not delete per-user WireRoute data.
 
-### Manager Service
+This is intentional data-preservation behavior. If organizational policy requires profile removal, perform it as a separate, explicitly reviewed user-data operation after confirming that no recovery material is needed.
 
-The manager service may be installed or uninstalled using the commands:
+## Tunnel lifecycle
+
+### Default mode
+
+WireRoute runs unprivileged. Activating or deactivating a profile invokes the bundled backend through a normal UAC prompt for that operation.
+
+While connected, the profile uses a Local System service named:
 
 ```text
-> wireguard /installmanagerservice
-> wireguard /uninstallmanagerservice
+WireGuardTunnel$<tunnel-name>
 ```
 
-This creates a service called `WireGuardManager`, which can be controlled using standard Windows service management utilites, such as `services.msc` or [`sc`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/sc-query).
+The service is demand-start in the default mode and is removed on disconnect. WireRoute does not keep an automatic manager service running.
 
-When executing `wireguard` with no arguments, the command first attempts to show the UI if the manager service is already running; otherwise it starts the manager service, waits for it to create a UI in the system tray, and then shows the main manager window. Therefore, `wireguard /installmanagerservice` is suitable for silent installation, whereas `wireguard` alone is suitable for interactive startup.
+### Persistent VPN
 
-The manager service monitors `%ProgramFiles%\WireGuard\Data\Configurations\` for the addition of new `.conf` files. Upon seeing one, it encrypts the file to a `.conf.dpapi` file, makes it unreadable to users other than Local System, confers the administrator only the ability to remove it, and then deletes the original unencrypted file. (Configurations can always be _exported_ later using the export feature of the UI.) Using this, configurations can programmatically be added to the secure store of the manager service simply by copying them into that directory.
+A user can enable Persistent VPN in Settings. Enabling it does not immediately install a global service when no tunnel is active. The next activated profile receives a WireRoute-marked, automatic per-tunnel service so it can remain connected across sign-out and restart. Active demand-start tunnels are replaced after confirmation.
 
-The UI is started in the system tray of all builtin Administrators when the manager service is running. A limited UI may also be started in the system tray of all builtin Network Configuration Operators, if the correct registry key is set. [See `adminregistry.md` for information.](adminregistry.md)
+Disabling Persistent VPN disconnects and removes WireRoute-owned persistent service copies. The user's DPAPI-protected local profiles remain available and future activations return to demand-start operation.
 
-### Diagnostic Logs
+Persistent VPN requires Profile DNS. WireRoute's encrypted DNS mode depends on an in-process loopback proxy in the signed-in tray application and therefore cannot provide pre-logon or post-sign-out name resolution.
 
-The manager and all tunnel services produce diagnostic logs in a shared ringbuffer-based log. This is shown in the UI, and also can be dumped to standard out using the command:
+### On-Demand
+
+Ethernet and Wi-Fi On-Demand selections are evaluated by the signed-in WireRoute application. They are convenient user-session automation, not a pre-logon machine policy and not a replacement for Persistent VPN.
+
+## Administrative boundaries
+
+- Users require the ability to approve elevation, or an administrator must provide an approved elevation workflow, to start and stop tunnels.
+- RouterOS credentials should belong to a dedicated least-privilege account where practical.
+- WireRoute does not currently publish ADMX templates, registry policies, machine-wide profile provisioning, or a supported command-line profile-management API.
+- The `HKLM\Software\WireGuard\LimitedOperatorUI` and `DangerousScriptExecution` values are inherited WireGuard behaviors and are not supported WireRoute policies. See [Administrative registry compatibility](adminregistry.md).
+- Do not install the inherited `WireGuardManager` service as a deployment shortcut. Its compatibility protocol and additional attack surface are documented in [Manager protocol v1](manager-protocol-v1.md) and [Attack surface](attacksurface.md).
+
+## Diagnostics and activity
+
+The application reads per-tunnel runtime logs and metrics from:
 
 ```text
-> wireguard /dumplog > C:\path\to\diagnostic\log.txt
+%LOCALAPPDATA%\WireRoute\Runtime\<profile-id>\
 ```
 
-Alternatively, the log can be tailed continuously, for passing it to logging services:
+The UI exposes the tunnel log, live transfer rates, latest handshake, session totals, and locally protected connection history. Connection-session retention is selectable as 1, 7, or 30 days. Activity is device-local; WireRoute does not upload telemetry or provide a central log collector.
 
-```text
-> wireguard /dumplog /tail | log-ingest
-```
+Runtime log reading is bounded to the newest 2 MiB. If enterprise collection is required, collect only reviewed diagnostics and treat endpoints, addresses, profile names, and timing as potentially sensitive network metadata.
 
-Or it can be monitored in PowerShell by piping to `select`:
+## Updates
 
-```text
-PS> wireguard /dumplog /tail | select
-```
+WireRoute currently has no supported in-app updater or scheduled update command. Publish a new signed MSI through the organization's normal software-distribution system and validate it before rollout.
 
-### Updates
+The inherited `/update`, `/installmanagerservice`, `/dumplog`, and related upstream WireGuard commands are not WireRoute enterprise interfaces. Their presence in the native backend does not make them supported deployment contracts.
 
-Administrators are notified of updates within the UI and can update from within the UI, but updates can also be invoked at the command line using the command:
+## Network policy considerations
 
-```text
-> wireguard /update
-```
+Full tunnel, Split tunnel, Profile DNS, encrypted DNS, private-address exclusion, and the WireGuard kill-switch behavior can materially affect routing and name resolution. Review [Network configuration quirks](netquirk.md) before standardizing profiles.
 
-Or, to log the status of that command:
-
-```text
-> wireguard /update 2> C:\path\to\update\log.txt
-```
-
-One could have Task Scheduler run it daily at 3am:
-
-```text
-> schtasks /create /f /ru SYSTEM /sc daily /tn "WireGuard Update" /tr "%PROGRAMFILES%\WireGuard\wireguard.exe /update" /st 03:00
-```
-
-### Driver Removal
-
-The tunnel service creates a network adapter at startup and destroys it at shutdown. If there are no more network adapters, the driver may be removed with:
-
-```text
-> wireguard /removedriver
-```
-
-Or, to log the status of that command:
-
-```text
-> wireguard /removedriver 2> C:\path\to\removal\log.txt
-```
+Test signed x64 and ARM64 artifacts on native hardware or VMs, including connect/disconnect, reboot behavior for Persistent VPN, DNS, routes, tray behavior, activity metrics, and uninstall/upgrade handling.

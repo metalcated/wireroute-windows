@@ -1,33 +1,90 @@
-# Network Configuration Quirks
+# Network configuration behavior and quirks
 
-As part of setting up a WireGuard tunnel, the tunnel service also sets up various network configuration parameters that are in one way or another related to the original configuration.
+WireRoute delegates adapter, route, firewall, and Profile DNS application to the inherited WireGuard for Windows tunnel engine. The WinUI application selects and rewrites profile policy, but it does not reimplement Windows networking in C#.
 
-### Routing
+## Routing
 
-The tunnel service takes all the allowed IPs from each peer, deduplicates them, and adds them to the routes for the WireGuard interface. The service then monitors which interface on the system has a default route (a route with a `/0` CIDR) that is not the WireGuard interface itself, and, if no MTU has been specified in the configuration, it sets the MTU of the WireGuard interface to be 80 less than the MTU of that default route interface. WireGuardNT also monitors the routing table and determines the outgoing route that does not loopback to itself, and then sends each packet using `IP_PKTINFO`/`IPV6_PKTINFO`. It keeps track of the incoming interface and source address for received packets, and always replies to the sender in that way.
+The tunnel service deduplicates every peer's `AllowedIPs` and adds the resulting prefixes as routes on the WireGuard interface. If the profile does not specify an MTU, it observes the non-WireGuard interface carrying the default route and sets the WireGuard interface MTU to 80 bytes less.
 
-### Firewall Considerations for `/0` Allowed IPs
+WireGuardNT observes the routing table to choose an outgoing path that does not loop back into itself. It sends with `IP_PKTINFO` or `IPV6_PKTINFO`, remembers the incoming interface and source address, and replies through the same path.
 
-If an interface has only one peer, and that peer contains an Allowed IP in `/0`, then WireGuard enables a so-called "kill-switch", which adds firewall rules to do the following:
+WireRoute exposes two policy modes:
 
-- Packets from the tunnel service itself are permitted, so that WireGuard packets can flow successfully.
-- If the configuration specifies DNS servers, then packets sent to port `53` are only permitted if they are to one of those DNS servers. This is to prevent Windows' [ordinary multihomed DNS resolution behavior](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd197552%28v%3Dws.10%29), so that DNS queries only go to the DNS server specified, rather than multiple DNS servers.
-- Loopback packets are permitted, and packets actually going through the WireGuard tunnel are permitted.
-- DHCP for IPv4 and IPv6 and NDP for IPv6 are permitted.
-- All other packets are blocked.
+- **Full** uses the address-family default route (`0.0.0.0/0` or `::/0`) and is intended to carry all supported traffic.
+- **Split** uses only the CIDR routes entered for that profile; other traffic follows the device's normal routing table.
 
-This prevents traffic from leaking outside the tunnel.
+Changing modes rewrites the stored configuration's allowed routes through the shared parser and formatter. Review multi-peer profiles carefully because `AllowedIPs` determine both route selection and the cryptographic peer used for a destination.
 
-If you'd like to use a default route _without_ having these restrictive kill-switch semantics, one may use the routes `0.0.0.0/1` and `128.0.0.0/1` in place of `0.0.0.0/0`, as well as `::/1` and `8000::/1` in place of `::/0`. This achieves nearly the same thing, but does not activate the above firewalling semantics. (The UI's editor has a checkbox that toggles this.)  And users without the need for a `/0` route at all do not have to worry about this, and instead fall back to ordinary Windows routing and DNS behavior.
+## Firewall behavior for default routes
 
-### Considerations for non-`/0` Allowed IPs
+When an interface has one peer and that peer contains a `/0` allowed prefix, the inherited tunnel service enables restrictive kill-switch behavior:
 
-When the above conditions do not apply, routing and DNS information is handed to Windows in the typical way for Windows to manage. This includes its [ordinary multihomed DNS resolution behavior](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd197552%28v%3Dws.10%29) as well as its ordinary routing table resolution. Users may make use of the normal Windows firewalling and network configuration capabilities to firewall this as needed. One firewall rule is added, however, which allows the tunnel service to send and receive WireGuard packets.
+- packets from the tunnel service are permitted so WireGuard transport can flow;
+- when DNS servers are configured, port 53 traffic is permitted only to those DNS servers;
+- loopback and packets through the WireGuard tunnel are permitted;
+- IPv4 and IPv6 DHCP and IPv6 neighbor discovery are permitted; and
+- other traffic is blocked.
 
-### Network List Manager
+This prevents supported traffic from leaking outside the tunnel if the protected route fails.
 
-Windows assigns a unique GUID to each new WireGuard adapter. The application takes pains to make this GUID deterministic, so that firewall policy (such as "public" vs "private" network categorization) can be consistently applied to the tunnel's network. This determinism is based on the configuration of the tunnel. Therefore, if the WireGuard configuration changes, so too will the unique GUID. Technical details are described in [a mailing list post](https://lists.zx2c4.com/pipermail/wireguard/2019-June/004259.html).
+A configuration can cover IPv4 without the exact `/0` trigger by using `0.0.0.0/1` plus `128.0.0.0/1`, and can cover IPv6 with `::/1` plus `8000::/1`. That avoids the inherited `/0` kill-switch condition and therefore has different leak behavior. Use it only when that tradeoff is intentional.
 
-### Adapter Lifetime
+## Excluding private IPv4 destinations
 
-WireGuard's network adapter is created dynamically when a tunnel is started and destroyed when a tunnel is stopped. This means that additional filters, address families, or protocols should be bound to the adapter programmatically, possibly through use of dangerous script execution in the configuration file or by way of automatic NDIS layer binding.
+For a compatible single-peer IPv4 full-tunnel profile, the editor exposes **Exclude private IPs**. WireRoute replaces `0.0.0.0/0` with an explicit set of non-private IPv4 prefixes, preserves IPv6 routes, and adds configured DNS server addresses to the allowed set so Profile DNS remains reachable.
+
+This is not equivalent to the two-half default-route workaround. It deliberately keeps private and other excluded IPv4 ranges on the local network while routing public IPv4 through the VPN. Changing DNS while exclusion is enabled refreshes the DNS routes.
+
+The control is hidden when the profile shape cannot be recognized safely, including incompatible multi-peer or custom-route configurations.
+
+## Split routes and ordinary Windows behavior
+
+Without the single-peer `/0` condition, Windows handles route selection and multihomed DNS in its ordinary way. Split mode is routing policy, not a general firewall or application allowlist. Traffic to destinations outside the configured prefixes can use another interface unless separate Windows Firewall or device-management policy prevents it.
+
+The tunnel service still creates the rule required for its WireGuard UDP transport.
+
+## DNS modes
+
+### Profile DNS
+
+Profile DNS uses the DNS server addresses in the WireGuard configuration. The tunnel service applies them to the WireGuard interface. Whether a DNS server is reachable through the tunnel depends on the profile's allowed routes; the private-address exclusion editor maintains explicit DNS routes when it owns that route pattern.
+
+### Encrypted DNS
+
+Encrypted DNS replaces the active runtime profile's DNS server with `127.0.0.1`. The signed-in WireRoute process binds UDP and TCP on loopback port 53 and forwards DNS wire messages to the selected HTTPS resolver using bootstrap IP addresses.
+
+Consequences:
+
+- only one WireRoute encrypted-DNS tunnel can be active;
+- another local DNS proxy using `127.0.0.1:53` prevents activation;
+- the tray process must remain running; and
+- Persistent VPN cannot use encrypted DNS because the proxy is not available before sign-in or after sign-out.
+
+WireRoute does not install a permanent system-wide DNS proxy.
+
+## Network List Manager identity
+
+Windows assigns a GUID to a WireGuard adapter. The inherited implementation derives it deterministically from tunnel configuration so firewall categorization can remain stable while the configuration is unchanged. A material configuration change can produce a different GUID and cause Windows or enterprise firewall policy to treat the adapter as a new network.
+
+The upstream derivation is described in the [WireGuard mailing-list discussion](https://lists.zx2c4.com/pipermail/wireguard/2019-June/004259.html).
+
+## Adapter and service lifetime
+
+The adapter exists only while its per-tunnel service is running.
+
+- Demand-start mode destroys the adapter and removes the service on disconnect.
+- Persistent VPN configures the same per-tunnel engine for automatic startup and removes the WireRoute-owned protected service copy when persistence is disabled.
+
+Additional filters, address families, or protocols should be deployed through separately reviewed administrative or NDIS policy. WireRoute blocks `PreUp`, `PostUp`, `PreDown`, and `PostDown` commands and does not support `DangerousScriptExecution` as a customization mechanism.
+
+## Validation checklist
+
+For any routing or DNS change, test:
+
+1. IPv4 and IPv6 separately.
+2. Full, Split, and private-address exclusion behavior.
+3. DNS reachability and leak behavior.
+4. Endpoint reachability after routes are applied.
+5. Sleep, network changes, sign-out, restart, and reconnect.
+6. Demand-start and Persistent VPN service removal.
+7. Both x64 and ARM64 release builds.

@@ -1,109 +1,124 @@
-# Building, Running, and Developing
+# Building, running, and developing
 
-### Building
+## Supported development targets
 
-Windows 10 64-bit or Windows Server 2019, and Git for Windows is required. The build script will take care of downloading, verifying, and extracting the right versions of the various dependencies:
+WireRoute release validation targets Windows 11 on native x64 and ARM64. The WinUI project declares `10.0.19041.0` as its minimum supported platform version, but Windows 10 is not a release-validation target.
 
-```text
-C:\Projects> git clone https://git.zx2c4.com/wireguard-windows
-C:\Projects> cd wireguard-windows
-C:\Projects\wireguard-windows> build
+Install:
+
+- Git for Windows;
+- Visual Studio 2022 with **Desktop development with .NET**;
+- the Windows 11 SDK;
+- .NET 10 SDK;
+- Go 1.25 or newer; and
+- PowerShell 7 or Windows PowerShell 5.1.
+
+The installer script downloads WiX Toolset 3.14.1 on first use and verifies the archive against a pinned SHA-256 hash.
+
+Clone the repository and use `main`:
+
+```powershell
+git clone https://github.com/metalcated/wireroute-windows.git
+Set-Location wireroute-windows
+git switch main
 ```
 
-### Running
+## Managed build and tests
 
-After publishing the WireRoute client, run `amd64\WireRoute.exe`. Closing the window keeps WireRoute in the notification area. Starting and stopping a tunnel requests elevation only for that operation; no persistent manager service is installed. The optional Persistent VPN preference installs an automatic, WireRoute-marked per-tunnel service instead of the manager service and removes that service copy when the preference is disabled.
+Build the x64 WinUI application:
 
-```text
-C:\Projects\wireroute-windows> amd64\WireRoute.exe
+```powershell
+dotnet build src\WireRoute.App\WireRoute.App.csproj -c Release -p:Platform=x64
 ```
 
-## Building the WireRoute WinUI client
+Use `-p:Platform=ARM64` for the ARM64 build.
 
-WireRoute releases target native x64 and ARM64 only. Publish the WinUI client into the matching WireGuard output directory with the repository script:
+Run the managed and focused native test suites:
 
-```text
-powershell -ExecutionPolicy Bypass -File scripts\Publish-WireRouteApp.ps1 -Platform x64
-powershell -ExecutionPolicy Bypass -File scripts\Publish-WireRouteApp.ps1 -Platform ARM64
+```powershell
+dotnet test tests\WireRoute.Core.Tests\WireRoute.Core.Tests.csproj -c Release
+dotnet test tests\WireRoute.RouterOS.Tests\WireRoute.RouterOS.Tests.csproj -c Release
+dotnet test tests\WireRoute.Storage.Tests\WireRoute.Storage.Tests.csproj -c Release -p:Platform=x64
+go test ./tunnel ./manager ./driver
 ```
 
-The script stages the complete unpackaged WinUI output, including the generated `.xbf` and `.pri` resources required at runtime. Do not copy only the executable and managed assemblies; an incomplete directory will build successfully but crash before creating a window.
+The Storage tests exercise Windows DPAPI and should run on Windows. Re-run them with the matching native platform when validating ARM64.
 
-Since WireGuard requires a driver to be installed, and this generally requires a valid Microsoft signature, you may benefit from first installing a release of WireGuard for Windows from the official [wireguard.com](https://www.wireguard.com/install/) builds, which bundles a Microsoft-signed driver, and then subsequently run your own wireguard.exe. Alternatively, you can craft your own installer using the `quickinstall.bat` script.
+## Preparing the native backend
 
-### Optional: Localizing
+The repository root `build.bat` downloads and verifies the inherited Windows toolchain and WireGuardNT package, renders resources, and builds the native backend:
 
-To translate WireGuard UI to your language:
-
-1. Upgrade `resources.rc` accordingly. Follow the pattern.
-
-2. Make a new directory in `locales\` containing the language ID:
-
-  ```text
-  C:\Projects\wireguard-windows> mkdir locales\<langID>
-  ```
-
-3. Configure and run `build` to prepare initial `locales\<langID>\messages.gotext.json` file:
-
-   ```text
-   C:\Projects\wireguard-windows> set GoGenerate=yes
-   C:\Projects\wireguard-windows> build
-   C:\Projects\wireguard-windows> copy locales\<langID>\out.gotext.json locales\<langID>\messages.gotext.json
-   ```
-
-4. Translate `locales\<langID>\messages.gotext.json`. See other language message files how to translate messages and how to tackle plural. For this step, the project is currently using [CrowdIn](https://crowdin.com/translate/WireGuard); please make sure your translations make it there in order to be added here.
-
-5. Run `build` from the step 3 again, and test.
-
-6. Repeat from step 4.
-
-### Optional: Creating the Installer
-
-The installer build script will take care of downloading, verifying, and extracting the right versions of the various dependencies:
-
-```text
-C:\Projects\wireguard-windows> cd installer
-C:\Projects\wireguard-windows\installer> build
+```powershell
+.\build.bat
 ```
 
-### Optional: Signing Binaries
+This creates the architecture-specific resource objects and native outputs used by the WireRoute release script. The x86 output is inherited from upstream WireGuard for Windows; WireRoute releases only x64 and ARM64.
 
-Add a file called `sign.bat` in the root of this repository with these contents, or similar:
+On WSL or another Linux environment, `make amd64/wireguard.exe arm64/wireguard.exe` can prepare the native backends when the required MinGW and ImageMagick tools are available. A complete WinUI/MSI release still requires Windows.
 
-```text
-set SigningProvider=/sha1 1b3afa5e2a76bb51f00020002dccadb165689c33
-set TimestampServer=http://timestamp.digicert.com
+## Publishing and running the WinUI app
+
+Publish a complete unpackaged application into the matching architecture directory:
+
+```powershell
+.\scripts\Publish-WireRouteApp.ps1 -Platform x64
+.\scripts\Publish-WireRouteApp.ps1 -Platform ARM64
 ```
 
-After, run the above `build` commands as usual, from a shell that has [`signtool.exe`](https://docs.microsoft.com/en-us/windows/desktop/SecCrypto/signtool) in its `PATH`, such as the Visual Studio 2017 command prompt.
+The default destinations are `amd64\` and `arm64\`. The native `wireguard.exe` must already be present beside the published application.
 
-### Alternative: Building from Linux
+Run the desired architecture:
 
-You must first have Mingw and ImageMagick installed.
-
-```text
-$ sudo apt install mingw-w64 imagemagick
-$ git clone https://git.zx2c4.com/wireguard-windows
-$ cd wireguard-windows
-$ make
+```powershell
+.\amd64\WireRoute.exe
 ```
 
-You can deploy the 64-bit build to an SSH host specified by the `DEPLOYMENT_HOST` environment variable (default "winvm") to the remote directory specified by the `DEPLOYMENT_PATH` environment variable (default "Desktop") by using the `deploy` target:
+Do not copy only `WireRoute.exe` and the managed assemblies. The unpackaged application also requires generated `.xbf` and `.pri` resources, Windows App SDK files, native dependencies, assets, and the matching backend. An incomplete directory can compile successfully and then fail before creating a window.
 
-```text
-$ make deploy
+Closing the main window leaves WireRoute in the notification area. In default mode, connect and disconnect request elevation only for the tunnel operation. Persistent VPN is opt-in and creates an automatic per-tunnel service; it does not install the inherited `WireGuardManager` service.
+
+## Building release artifacts
+
+After native resources have been prepared, create both architectures, MSI installers, portable ZIPs, and the checksum manifest:
+
+```powershell
+.\scripts\Build-WireRouteRelease.ps1 -Version 1.0.0
 ```
 
-### [`wg(8)`](https://git.zx2c4.com/wireguard-tools/about/src/man/wg.8) Support for Windows
-
-The command line utility [`wg(8)`](https://git.zx2c4.com/wireguard-tools/about/src/man/wg.8) works well on Windows. Being a Unix-centric project, it compiles with a Makefile and MingW:
+Outputs are written to `installer\dist`:
 
 ```text
-$ git clone https://git.zx2c4.com/wireguard-tools
-$ PLATFORM=windows make -C wireguard-tools/src
-$ stat wireguard-tools/src/wg.exe
+WireRoute-x64-1.0.0.msi
+WireRoute-x64-1.0.0.zip
+WireRoute-ARM64-1.0.0.msi
+WireRoute-ARM64-1.0.0.zip
+WireRoute-1.0.0-SHA256SUMS.txt
 ```
 
-It interacts with WireGuard instances run by the main WireGuard for Windows program.
+`Build-WireRouteInstaller.ps1` can build one MSI from an already staged application directory. `Publish-WireRouteApp.ps1` and `Build-WireRouteInstaller.ps1` are lower-level helpers; the release script is the canonical full build.
 
-When building on Windows, the aforementioned `build.bat` script takes care of building this.
+## Signing
+
+For a certificate available to SignTool through the Windows certificate store, pass its SHA-1 thumbprint:
+
+```powershell
+.\scripts\Build-WireRouteRelease.ps1 `
+    -Version 1.0.0 `
+    -SigningCertificateThumbprint YOUR_CERTIFICATE_THUMBPRINT
+```
+
+The default RFC 3161 timestamp service is `https://timestamp.digicert.com` and can be replaced with `-TimestampServer` using another HTTPS URL.
+
+The current local signing path signs `WireRoute.exe`, `WireRoute.dll`, the native `wireguard.exe`, and each MSI. Production signing may instead be performed by the approved SignPath pipeline described in [Code-signing policy](../CODE_SIGNING_POLICY.md). In either path, verify signatures on the final staged files and MSI rather than assuming that a successful build produced signed artifacts.
+
+## Installer behavior
+
+The WireRoute MSI is per-machine, installs under Program Files, creates a Start menu shortcut, and does not automatically launch the application. It supports standard quiet MSI deployment; see [Enterprise deployment](enterprise.md).
+
+## Localization
+
+The inherited Go backend contains upstream WireGuard localization resources, but the WireRoute WinUI interface does not currently have a supported localization contribution workflow. Do not use the inherited CrowdIn instructions as a WireRoute UI process. When WinUI localization is introduced, document its resource format and validation commands here.
+
+## Command-line tooling
+
+The upstream `wg.exe` utility can inspect WireGuardNT adapters when run with sufficient permissions, but it is not part of the supported WireRoute UI workflow or release artifact contract. Use it as an advanced WireGuard diagnostic tool, not as a replacement for WireRoute profile storage or service ownership.

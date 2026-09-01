@@ -1,39 +1,29 @@
-# Registry Keys for Admins
+# Administrative registry compatibility
 
-These are advanced configuration knobs that admins can set to do unusual things
-that are not recommended. There is no UI to enable these, and no such thing is
-planned. These registry keys may also be removed at some point in the future.
-The uninstaller will clean up the entirety of `HKLM\Software\WireGuard`. Use
-at your own risk, and please make sure you know what you're doing.
+WireRoute does not currently expose supported registry-based policy settings. The normal application is an unprivileged, per-user WinUI process, and the standard installer does not install the inherited `WireGuardManager` service.
 
-#### `HKLM\Software\WireGuard\LimitedOperatorUI`
+This page records inherited WireGuard registry behavior so administrators do not mistake it for a supported WireRoute configuration surface.
 
-When this key is set to `DWORD(1)`, the UI will be launched on desktops of
-users belonging to the Network Configuration Operators builtin group
-(S-1-5-32-556), with the following limitations for members of that group:
+## WireRoute installer bookkeeping
 
-  - Configurations are stripped of all public, private, and pre-shared keys;
-  - No version update popup notifications are shown, and updates are not permitted, though a tab still indicates the availability;
-  - Adding, removing, editing, importing, or exporting configurations is forbidden; and
-  - Quitting the manager is forbidden.
+The MSI creates `HKCU\Software\WireRoute\Installed` as a Windows Installer component key path for the Start menu shortcut. It is not a policy switch and should not be edited to configure the application.
 
-However, basic functionality such as starting and stopping tunnels remains intact.
+WireRoute does not claim ownership of the entire `HKLM\Software\WireGuard` key, and its installer does not promise to remove settings created by WireGuard for Windows or another product.
 
-```
-> reg add HKLM\Software\WireGuard /v LimitedOperatorUI /t REG_DWORD /d 1 /f
-```
+## Inherited keys that WireRoute does not support
 
-#### `HKLM\Software\WireGuard\DangerousScriptExecution`
+### `HKLM\Software\WireGuard\LimitedOperatorUI`
 
-When this key is set to `DWORD(1)`, the tunnel service will execute the commands
-specified in the `PreUp`, `PostUp`, `PreDown`, and `PostDown` options of a
-tunnel configuration. Note that this execution is done as the Local System user,
-which runs with the highest permissions on the operating system, and is therefore
-a real target of malware. Therefore, you should enable this option only with the
-utmost trepidation. Rather than use `%i`, WireGuard for Windows instead sets the
-environment variable `WIREGUARD_TUNNEL_NAME` to the name of the tunnel when
-executing these scripts.
+Upstream WireGuard for Windows reads this value only from its automatic manager-service workflow. The standard WireRoute installer and normal WireRoute launch path do not install or connect to that manager, so setting this value has no effect on the supported WireRoute experience.
 
-```
-> reg add HKLM\Software\WireGuard /v DangerousScriptExecution /t REG_DWORD /d 1 /f
-```
+The inherited manager compatibility code remains in the native backend for earlier development deployments. Manually installing that manager expands the privileged attack surface and is not a supported way to deploy WireRoute. See [Enterprise deployment](enterprise.md) and [Manager protocol v1](manager-protocol-v1.md).
+
+### `HKLM\Software\WireGuard\DangerousScriptExecution`
+
+Upstream WireGuard tunnel services can use this value to permit `PreUp`, `PostUp`, `PreDown`, and `PostDown` commands as Local System. WireRoute intentionally detects those hooks and blocks activation before invoking either its demand-start or Persistent VPN tunnel path.
+
+Setting this registry value is therefore not a supported bypass. Remove hook commands from profiles used by WireRoute and perform required machine configuration through separately reviewed administrative tooling or device-management policy.
+
+## Future policy support
+
+If WireRoute adds enterprise policy settings, they should use WireRoute-owned names, document their scope and precedence, and include deployment and removal behavior here. Until then, Settings in the application is the supported configuration surface.
