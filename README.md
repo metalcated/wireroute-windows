@@ -4,6 +4,23 @@ WireRoute is a native WinUI 3 WireGuard and RouterOS client for Windows 11. Its 
 
 Native releases are produced independently for x64 and ARM64. x86 emulation is not a release target.
 
+## Support, privacy, and project policies
+
+- [Official downloads and verification](DOWNLOADS.md)
+- [Secure RouterOS WireGuard setup](ROUTEROS_SETUP.md)
+- [Support and contact](SUPPORT.md)
+- [Privacy policy](PRIVACY.md)
+- [Security reporting](SECURITY.md)
+- [Code signing policy](CODE_SIGNING_POLICY.md)
+- [Legal and open-source notices](LEGAL.md)
+- [MIT License](COPYING)
+
+## Code signing
+
+WireRoute is applying for sponsored open-source code signing through SignPath Foundation. Until the application is accepted and the verified release pipeline is active, published Windows artifacts remain unsigned and should be checked against the SHA-256 manifest included with each release.
+
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
+
 ## Current capabilities
 
 - Protected WireGuard profile import, ZIP import/export, creation, editing, QR display, and key copy.
