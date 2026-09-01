@@ -2,7 +2,7 @@
 
 ## Free and open source
 
-WireRoute is intended to be distributed as a free application. Its source code is available under the [MIT License](COPYING), the same permissive license used by the WireGuard for Windows project on which WireRoute is based.
+WireRoute is intended to be distributed as a free application. Its source code is available under the [MIT License](../COPYING), the same permissive license used by the WireGuard for Windows project on which WireRoute is based.
 
 The MIT License permits use, copying, modification, distribution, sublicensing, and sale subject to preservation of its copyright and license notice. It also provides the software without warranty.
 

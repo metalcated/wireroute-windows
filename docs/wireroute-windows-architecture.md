@@ -88,7 +88,7 @@ Connection history is local, limited to the newest 1000 sessions, and purged acc
 - Peer creation changes only one `/interface/wireguard/peers` resource after explicit review.
 - The default list includes only peers whose comment is `Managed by WireRoute`; `Show all peers` reveals other peers.
 
-See [macOS RouterOS parity baseline](macos-routeros-parity.md) and [RouterOS setup](../ROUTEROS_SETUP.md).
+See [macOS RouterOS parity baseline](macos-routeros-parity.md) and [RouterOS setup](ROUTEROS_SETUP.md).
 
 ## Activity boundary
 
@@ -107,7 +107,7 @@ The standard MSI does not install the manager and a normal launch does not conne
 - The WinUI client targets .NET 10 and Windows App SDK 2.4.
 - Native releases are produced independently for x64 and ARM64.
 - The release script builds both backends and self-contained app directories, creates per-machine MSIs and portable ZIPs, and writes a SHA-256 manifest.
-- Production artifacts require the signing and publication controls in [Code-signing policy](../CODE_SIGNING_POLICY.md).
+- Production artifacts require the signing and publication controls in [Code-signing policy](CODE_SIGNING_POLICY.md).
 
 ## Release gates
 

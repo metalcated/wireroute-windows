@@ -35,4 +35,4 @@ For a suspected security vulnerability, follow the private-reporting guidance in
 
 ## License and warranty
 
-WireRoute is provided under the [MIT License](COPYING), without warranty. Support is community-based and response times are not guaranteed.
+WireRoute is provided under the [MIT License](../COPYING), without warranty. Support is community-based and response times are not guaranteed.

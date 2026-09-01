@@ -6,13 +6,13 @@ Native releases are produced independently for x64 and ARM64. x86 emulation is n
 
 ## Support, privacy, and project policies
 
-- [Official downloads and verification](DOWNLOADS.md)
-- [Secure RouterOS WireGuard setup](ROUTEROS_SETUP.md)
-- [Support and contact](SUPPORT.md)
-- [Privacy policy](PRIVACY.md)
-- [Security reporting](SECURITY.md)
-- [Code signing policy](CODE_SIGNING_POLICY.md)
-- [Legal and open-source notices](LEGAL.md)
+- [Official downloads and verification](docs/DOWNLOADS.md)
+- [Secure RouterOS WireGuard setup](docs/ROUTEROS_SETUP.md)
+- [Support and contact](docs/SUPPORT.md)
+- [Privacy policy](docs/PRIVACY.md)
+- [Security reporting](docs/SECURITY.md)
+- [Code signing policy](docs/CODE_SIGNING_POLICY.md)
+- [Legal and open-source notices](docs/LEGAL.md)
 - [MIT License](COPYING)
 
 ## Code signing

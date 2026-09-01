@@ -25,7 +25,7 @@ msiexec.exe /x WireRoute-x64-1.0.0.msi /qn /norestart
 
 The package installs under Program Files and creates a Start menu shortcut. It does not automatically launch WireRoute and currently defines no product-specific MSI policy properties. Same-version upgrades are allowed; downgrades are blocked. x64 and ARM64 packages have separate upgrade identities, so deploy only the native package for each device.
 
-Verify the Authenticode signature and published SHA-256 value before enterprise deployment. See [Downloads](../DOWNLOADS.md) and [Code-signing policy](../CODE_SIGNING_POLICY.md).
+Verify the Authenticode signature and published SHA-256 value before enterprise deployment. See [Downloads](DOWNLOADS.md) and [Code-signing policy](CODE_SIGNING_POLICY.md).
 
 ## User data and uninstall behavior
 

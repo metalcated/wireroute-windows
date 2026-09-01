@@ -109,7 +109,7 @@ For a certificate available to SignTool through the Windows certificate store, p
 
 The default RFC 3161 timestamp service is `https://timestamp.digicert.com` and can be replaced with `-TimestampServer` using another HTTPS URL.
 
-The current local signing path signs `WireRoute.exe`, `WireRoute.dll`, the native `wireguard.exe`, and each MSI. Production signing may instead be performed by the approved SignPath pipeline described in [Code-signing policy](../CODE_SIGNING_POLICY.md). In either path, verify signatures on the final staged files and MSI rather than assuming that a successful build produced signed artifacts.
+The current local signing path signs `WireRoute.exe`, `WireRoute.dll`, the native `wireguard.exe`, and each MSI. Production signing may instead be performed by the approved SignPath pipeline described in [Code-signing policy](CODE_SIGNING_POLICY.md). In either path, verify signatures on the final staged files and MSI rather than assuming that a successful build produced signed artifacts.
 
 ## Installer behavior
 

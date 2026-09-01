@@ -85,7 +85,7 @@ Manually enabling the legacy manager adds a long-running Local System service, s
 
 ## Release and distribution boundary
 
-Release artifacts include executable code, native dependencies, the WireGuardNT resource, and an MSI. Production artifacts should be Authenticode-signed and timestamped, hashes must be published, and the signing identity must be isolated from ordinary development credentials. See [Code-signing policy](../CODE_SIGNING_POLICY.md).
+Release artifacts include executable code, native dependencies, the WireGuardNT resource, and an MSI. Production artifacts should be Authenticode-signed and timestamped, hashes must be published, and the signing identity must be isolated from ordinary development credentials. See [Code-signing policy](CODE_SIGNING_POLICY.md).
 
 ## Security review priorities
 

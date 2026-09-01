@@ -63,4 +63,4 @@ For privacy questions, use the contact methods in [SUPPORT.md](SUPPORT.md). Do n
 
 ## Open-source notice
 
-WireRoute is free and open-source software provided under the [MIT License](COPYING). See [LEGAL.md](LEGAL.md) for attribution and trademark information.
+WireRoute is free and open-source software provided under the [MIT License](../COPYING). See [LEGAL.md](LEGAL.md) for attribution and trademark information.
