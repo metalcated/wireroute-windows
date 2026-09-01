@@ -52,7 +52,7 @@ Requests carry protocol version, a positive request ID, a method, and method par
     "protocol": "wireroute-manager",
     "minimumVersion": 1,
     "maximumVersion": 1,
-    "clientVersion": "1.0.0",
+    "clientVersion": "1.1.1",
     "architecture": "x64"
   }
 }
@@ -67,7 +67,7 @@ Responses echo the request ID and contain exactly one of `result` or `error`:
   "result": {
     "protocol": "wireroute-manager",
     "selectedVersion": 1,
-    "managerVersion": "1.0.0",
+    "managerVersion": "1.1.1",
     "capabilities": {
       "canListProfiles": true,
       "canReadProfileDetails": true,

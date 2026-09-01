@@ -51,7 +51,7 @@ go test ./tunnel ./manager ./driver
 Build the native x64 and ARM64 backends, self-contained WinUI applications, MSI installers, portable ZIPs, and SHA-256 manifest with:
 
 ```powershell
-.\scripts\Build-WireRouteRelease.ps1 -Version 1.0.0
+.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.1
 ```
 
 Pass `-SigningCertificateThumbprint` to sign release binaries and installers with a certificate in the Windows certificate store. Output is written to `installer\dist`.
