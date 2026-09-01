@@ -8,12 +8,18 @@ public sealed class RouterOSDiscoveryRow
     {
     }
 
-    private RouterOSDiscoveryRow(string name, string detail, string status, bool isPeer)
+    private RouterOSDiscoveryRow(
+        string name,
+        string detail,
+        string status,
+        bool isPeer,
+        RouterOSWireGuardPeer? peer = null)
     {
         Name = name;
         Detail = detail;
         Status = status;
         IsPeer = isPeer;
+        Peer = peer;
     }
 
     public string Name { get; set; } = string.Empty;
@@ -23,6 +29,8 @@ public sealed class RouterOSDiscoveryRow
     public string Status { get; set; } = string.Empty;
 
     public bool IsPeer { get; set; }
+
+    public RouterOSWireGuardPeer? Peer { get; }
 
     public static RouterOSDiscoveryRow FromInterface(RouterOSWireGuardInterface value) => new(
         value.Name,
@@ -38,7 +46,7 @@ public sealed class RouterOSDiscoveryRow
             : string.IsNullOrWhiteSpace(value.LastHandshake)
                 ? "No handshake"
                 : $"Handshake {value.LastHandshake} ago";
-        return new RouterOSDiscoveryRow(name, value.InterfaceName, status, true);
+        return new RouterOSDiscoveryRow(name, value.InterfaceName, status, true, value);
     }
 
     private static string? FirstNonempty(params string?[] values) =>

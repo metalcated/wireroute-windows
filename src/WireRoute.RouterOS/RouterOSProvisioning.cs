@@ -231,6 +231,140 @@ public sealed record RouterOSClientAddressSuggestion(RoutePrefix Address, int So
     }
 }
 
+public enum RouterOSMissingProfileRecoveryError
+{
+    MissingInterface,
+    MissingClientAddress,
+    ClientAddressMismatch,
+}
+
+public sealed class RouterOSMissingProfileRecoveryException : ArgumentException
+{
+    public RouterOSMissingProfileRecoveryException(
+        RouterOSMissingProfileRecoveryError error,
+        string message)
+        : base(message)
+    {
+        Error = error;
+    }
+
+    public RouterOSMissingProfileRecoveryError Error { get; }
+}
+
+public static class RouterOSMissingProfileRecoveryValidator
+{
+    public static RoutePrefix? SuggestedClientAddress(RouterOSWireGuardPeer peer)
+    {
+        ArgumentNullException.ThrowIfNull(peer);
+        var hostAddresses = PeerHostAddresses(peer)
+            .Distinct()
+            .ToArray();
+        return hostAddresses.Length == 1 ? hostAddresses[0] : null;
+    }
+
+    public static RoutePrefix Validate(
+        RouterOSWireGuardPeer peer,
+        RouterOSWireGuardInterface routerInterface,
+        string clientAddress)
+    {
+        ArgumentNullException.ThrowIfNull(peer);
+        ArgumentNullException.ThrowIfNull(routerInterface);
+        if (!routerInterface.Name.Equals(peer.InterfaceName, StringComparison.Ordinal))
+        {
+            throw Error(
+                RouterOSMissingProfileRecoveryError.MissingInterface,
+                $"RouterOS interface {peer.InterfaceName} is not available in the current discovery results.");
+        }
+
+        RoutePrefix candidate;
+        try
+        {
+            candidate = new RoutePrefix(clientAddress);
+        }
+        catch (RoutePrefixValidationException)
+        {
+            throw Error(
+                RouterOSMissingProfileRecoveryError.MissingClientAddress,
+                "Enter one client host address from this RouterOS peer.");
+        }
+
+        var requiredPrefixLength = candidate.Family == IpFamily.Ipv4 ? 32 : 128;
+        if (candidate.PrefixLength != requiredPrefixLength)
+        {
+            throw Error(
+                RouterOSMissingProfileRecoveryError.MissingClientAddress,
+                "The recovered client address must be an IPv4 /32 or IPv6 /128 host address.");
+        }
+
+        if (!PeerHostAddresses(peer).Contains(candidate))
+        {
+            throw Error(
+                RouterOSMissingProfileRecoveryError.ClientAddressMismatch,
+                "The client address must exactly match a host address assigned to this RouterOS peer.");
+        }
+
+        return candidate;
+    }
+
+    private static IEnumerable<RoutePrefix> PeerHostAddresses(RouterOSWireGuardPeer peer)
+    {
+        foreach (var value in peer.AllowedAddresses)
+        {
+            RoutePrefix prefix;
+            try
+            {
+                prefix = new RoutePrefix(value);
+            }
+            catch (RoutePrefixValidationException)
+            {
+                continue;
+            }
+
+            var requiredPrefixLength = prefix.Family == IpFamily.Ipv4 ? 32 : 128;
+            if (prefix.PrefixLength == requiredPrefixLength)
+            {
+                yield return prefix;
+            }
+        }
+    }
+
+    private static RouterOSMissingProfileRecoveryException Error(
+        RouterOSMissingProfileRecoveryError error,
+        string message) => new(error, message);
+}
+
+public enum RouterOSPeerKeyRecoveryState
+{
+    RequiresReplacement,
+    ReplacementConfirmed,
+    Conflict,
+}
+
+public static class RouterOSPeerKeyRecoveryReconciler
+{
+    public static RouterOSPeerKeyRecoveryState Reconcile(
+        string currentPublicKey,
+        string originalPublicKey,
+        string replacementPublicKey)
+    {
+        if (!RouterOSPeerCreation.IsWireGuardKey(currentPublicKey)
+            || !RouterOSPeerCreation.IsWireGuardKey(originalPublicKey)
+            || !RouterOSPeerCreation.IsWireGuardKey(replacementPublicKey))
+        {
+            throw RouterOSProvisioningErrors.Create(RouterOSProvisioningError.InvalidKey);
+        }
+
+        if (currentPublicKey.Equals(replacementPublicKey, StringComparison.Ordinal))
+        {
+            return RouterOSPeerKeyRecoveryState.ReplacementConfirmed;
+        }
+
+        return currentPublicKey.Equals(originalPublicKey, StringComparison.Ordinal)
+            ? RouterOSPeerKeyRecoveryState.RequiresReplacement
+            : RouterOSPeerKeyRecoveryState.Conflict;
+    }
+}
+
 public sealed class RouterOSPeerCreation
 {
     public const string WireRouteManagedComment = "Managed by WireRoute";

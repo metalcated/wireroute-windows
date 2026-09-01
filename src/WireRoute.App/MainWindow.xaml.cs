@@ -56,6 +56,7 @@ public sealed partial class MainWindow : Window
             UpdateProfilesEmptyState();
             UpdateTrayIconAppearance();
             UpdatePersistentTunnelStatusText(appSettings.PersistentTunnelService);
+            UpdateRouterOSRecoveryAction();
         };
         UpdateTrayIconAppearance();
         StartOnDemandMonitoring();

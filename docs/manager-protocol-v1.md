@@ -16,7 +16,7 @@ When a legacy manager is already installed, it can launch `WireRoute.exe /manage
 - Protocol v1 has a distinct `/manager-v1` launch mode; neither side guesses between JSON and the inherited Go `gob` protocol.
 - `hello` must be the first request. Unsupported versions are rejected before any other method.
 - Every frame is limited to 1 MiB before allocating its JSON payload.
-- Read responses never return interface private keys, preshared keys, hook command text, or decrypted configuration text.
+- Profile summaries return the interface public key so the UI can prove that a discovered RouterOS peer already has a matching profile before offering key recovery. Read responses never return interface private keys, preshared keys, hook command text, or decrypted configuration text.
 - Imports are parsed by the authoritative Go parser. Any `PreUp`, `PostUp`, `PreDown`, or `PostDown` hook causes the import to fail.
 - Privileged methods are capability-advertised and checked against the manager session's elevated token.
 

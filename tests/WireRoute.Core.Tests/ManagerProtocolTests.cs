@@ -14,7 +14,12 @@ public sealed class ManagerProtocolTests
     {
         var response = ManagerResponse.Success(
             7,
-            new ManagerProfileSummary("office", "Office VPN", ManagerTunnelState.Started, TunnelRouteMode.Full));
+            new ManagerProfileSummary(
+                "office",
+                "Office VPN",
+                ManagerTunnelState.Started,
+                TunnelRouteMode.Full,
+                "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="));
 
         var json = Encoding.UTF8.GetString(ManagerProtocolJson.Serialize(response));
 
@@ -22,7 +27,26 @@ public sealed class ManagerProtocolTests
         StringAssert.Contains(json, "\"state\":\"started\"");
         StringAssert.Contains(json, "\"detectedRouteMode\":\"full\"");
         StringAssert.Contains(json, "\"displayName\":\"Office VPN\"");
+        StringAssert.Contains(json, "\"interfacePublicKey\":");
         Assert.IsFalse(json.Contains("RequestId", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void OlderProfileSummaryWithoutPublicKeyRemainsReadable()
+    {
+        var response = ManagerProtocolJson.Deserialize<ManagerListProfilesResponse>(
+            Encoding.UTF8.GetBytes("""
+                {
+                  "profiles": [{
+                    "name": "office",
+                    "displayName": "Office VPN",
+                    "state": "stopped",
+                    "detectedRouteMode": "split"
+                  }]
+                }
+                """));
+
+        Assert.IsNull(response.Profiles.Single().InterfacePublicKey);
     }
 
     [TestMethod]

@@ -293,7 +293,19 @@ Then verify each behavior from the actual client and from an unapproved source:
 - Plain HTTP, TCP 8728, and TCP 8729 are not reachable unless intentionally required.
 - A handshake alone is not considered success; routing, firewall, NAT, and DNS must also pass.
 
-## 10. Roll back safely
+## 10. Recover a lost client private key safely
+
+A WireGuard private key cannot be reconstructed from its public key or from RouterOS. If a WireRoute profile is lost while its RouterOS peer remains, select that exact peer in RouterOS Peers and choose `Recover Profile…`.
+
+WireRoute generates a new key pair locally and reconstructs an editable client configuration from the peer, its WireGuard interface, endpoint discovery, and the saved DNS, route, and keepalive defaults. Recovery requires one exact IPv4 `/32` or IPv6 `/128` already present in that peer's `allowed-address`; a broad protected-network route is not accepted as the client address.
+
+The review shows both the current and replacement public keys. Confirmation protects the complete private configuration with current-user DPAPI before PATCHing only the selected peer's `public-key`. It does not change addresses, routes, firewall, NAT, the RouterOS interface key, or another peer.
+
+If the request or profile import is interrupted, reconnect, select the same router and peer, and choose `Resume Recovery…`. WireRoute verifies the protected private key and reconciles the current RouterOS key before continuing. It updates an unchanged original key, skips an already-confirmed replacement, and stops without writing if a different third key is present. Do not start a second manual key rotation while a protected recovery is pending.
+
+After recovery, activate the profile and repeat the complete path validation above. The old client configuration, if later found, is no longer valid because RouterOS now trusts the replacement public key.
+
+## 11. Roll back safely
 
 If a new rule causes a problem, disable the exact rule by its unique comment first instead of deleting it. Confirm every `find` result before changing it:
 

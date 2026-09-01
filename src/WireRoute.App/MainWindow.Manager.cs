@@ -82,9 +82,11 @@ public sealed partial class MainWindow
             }
             else
             {
-                existing.UpdateState(summary.State);
+                existing.UpdateSummary(summary);
             }
         }
+
+        UpdateRouterOSRecoveryAction();
     }
 
     private async Task ReadManagerEventsAsync()
@@ -432,6 +434,7 @@ public sealed partial class MainWindow
         RouterOSPeerActionHelpText.Visibility = RouterOSSetUpPeerButton.IsEnabled
             ? Visibility.Collapsed
             : Visibility.Visible;
+        UpdateRouterOSRecoveryAction();
     }
 
     private async void MainWindow_Closed(object sender, WindowEventArgs args)

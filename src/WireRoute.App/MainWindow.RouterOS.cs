@@ -131,6 +131,7 @@ public sealed partial class MainWindow
             var addresses = await addressesTask;
             routerOSPublicEndpointSuggestion = RouterOSPublicEndpointSuggestion.Discover(addresses);
             routerOSConnectedContext = new RouterOSConnectedContext(connection, trustedCertificate);
+            await RefreshRouterOSProfileRecoveriesAsync();
             RebuildRouterOSDiscovery();
             RouterOSConnectButton.Content = "Connected";
             ToolTipService.SetToolTip(
@@ -256,6 +257,7 @@ public sealed partial class MainWindow
         RouterOSConnectButton.IsEnabled = !isBusy && RouterOSConnectionPicker.SelectedItem is not null;
         RouterOSShowAllPeersCheckBox.IsEnabled = !isBusy && routerOSPeers.Count > 0;
         UpdateRouterOSManagerAvailability();
+        UpdateRouterOSRecoveryAction();
     }
 
     private void SetRouterOSStatus(string status, bool isError = false, bool isSuccess = false)
@@ -275,12 +277,14 @@ public sealed partial class MainWindow
         routerOSPeers = [];
         routerOSPublicEndpointSuggestion = null;
         RouterOSDiscoveryRows.Clear();
+        RouterOSDiscoveryList.SelectedItem = null;
         RouterOSSummaryText.Text = "Not connected";
         RouterOSDiscoveryEmptyText.Text = "Connect to securely discover WireGuard peers.";
         RouterOSDiscoveryEmptyText.Visibility = Visibility.Visible;
         RouterOSShowAllPeersCheckBox.IsChecked = false;
         RouterOSShowAllPeersCheckBox.IsEnabled = false;
         RouterOSSetUpPeerButton.IsEnabled = false;
+        RouterOSRecoverProfileButton.IsEnabled = false;
         RouterOSConnectButton.Content = "Connect";
         ToolTipService.SetToolTip(RouterOSConnectButton, null);
         if (status is not null)
@@ -291,6 +295,7 @@ public sealed partial class MainWindow
 
     private void RebuildRouterOSDiscovery()
     {
+        var selectedPeerId = (RouterOSDiscoveryList.SelectedItem as RouterOSDiscoveryRow)?.Peer?.Id;
         var managedPeers = routerOSPeers
             .Where(peer => RouterOSPeerCreation.IsWireRouteManagedComment(peer.Comment))
             .ToArray();
@@ -302,6 +307,9 @@ public sealed partial class MainWindow
         {
             RouterOSDiscoveryRows.Add(RouterOSDiscoveryRow.FromPeer(peer));
         }
+
+        RouterOSDiscoveryList.SelectedItem = RouterOSDiscoveryRows.FirstOrDefault(value =>
+            value.Peer?.Id.Equals(selectedPeerId, StringComparison.Ordinal) == true);
 
         RouterOSSummaryText.Text = RouterOSShowAllPeersCheckBox.IsChecked == true
             ? $"{routerOSPeers.Count} peers"
@@ -315,7 +323,11 @@ public sealed partial class MainWindow
             || (routerOSPeers.Count > 0 && displayedPeers.Count == 0)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        UpdateRouterOSRecoveryAction();
     }
+
+    private void RouterOSDiscoveryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        UpdateRouterOSRecoveryAction();
 
     private void RouterOSShowAllPeersCheckBox_Changed(object sender, RoutedEventArgs e)
     {

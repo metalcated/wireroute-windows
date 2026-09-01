@@ -357,6 +357,59 @@ public sealed class ProtectedRouterOSStorageTests
     }
 
     [TestMethod]
+    public async Task ProfileRecoveryStoreScopesKeyReplacementToRouterAndPeer()
+    {
+        var directory = NewStorageDirectory();
+        var store = new RouterOSProfileRecoveryStore(directory);
+        var connectionId = Guid.NewGuid();
+        var originalKey = Convert.ToBase64String(
+            Enumerable.Range(1, 32).Select(value => (byte)value).ToArray());
+        var replacementKey = Convert.ToBase64String(
+            Enumerable.Range(33, 32).Select(value => (byte)value).ToArray());
+        var recovery = new RouterOSProfileRecovery(
+            Guid.NewGuid(),
+            "Laptop",
+            "[Interface]\nPrivateKey = private-material",
+            DateTimeOffset.UtcNow,
+            RouterOSProfileRecoveryReason.PendingRouterKeyReplacement)
+        {
+            RouterConnectionId = connectionId,
+            RouterPeerId = "*9",
+            OriginalPeerPublicKey = originalKey,
+            ReplacementPublicKey = replacementKey,
+            ProfileId = Guid.NewGuid(),
+            TunnelName = "Laptop-stable-id",
+        };
+
+        await store.SaveAsync(recovery);
+
+        Assert.AreEqual(recovery, await store.LoadForPeerAsync(connectionId, "*9"));
+        Assert.IsNull(await store.LoadForPeerAsync(Guid.NewGuid(), "*9"));
+        Assert.IsNull(await store.LoadForPeerAsync(connectionId, "*10"));
+        var protectedBytes = await File.ReadAllBytesAsync(
+            Path.Combine(directory, "routeros-profile-recovery.dpapi"));
+        var ciphertext = Encoding.UTF8.GetString(protectedBytes);
+        Assert.IsFalse(ciphertext.Contains("private-material", StringComparison.Ordinal));
+        Assert.IsFalse(ciphertext.Contains(originalKey, StringComparison.Ordinal));
+        Assert.IsFalse(ciphertext.Contains(replacementKey, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ProfileRecoveryStoreRejectsIncompleteKeyReplacementMetadata()
+    {
+        var store = new RouterOSProfileRecoveryStore(NewStorageDirectory());
+        var recovery = new RouterOSProfileRecovery(
+            Guid.NewGuid(),
+            "Laptop",
+            "[Interface]\nPrivateKey = private-material",
+            DateTimeOffset.UtcNow,
+            RouterOSProfileRecoveryReason.PendingRouterKeyReplacement);
+
+        await Assert.ThrowsExactlyAsync<ArgumentException>(async () =>
+            await store.SaveAsync(recovery));
+    }
+
+    [TestMethod]
     public async Task CertificateStorePinsExactDerToHostAndPort()
     {
         var store = new RouterOSCertificateStore(NewStorageDirectory());

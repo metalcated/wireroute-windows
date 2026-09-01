@@ -3,7 +3,7 @@
 ## Reference points
 
 - Windows foundation: WireGuard for Windows commit `4e6726c`, including WireGuardNT, the Go tunnel engine, per-tunnel services, routing, DNS integration, native diagnostics, and installer foundations.
-- Product parity baseline: WireRoute Apple commit `efaba13`, recorded in [macOS RouterOS parity baseline](macos-routeros-parity.md).
+- Product parity baseline: WireRoute Apple commit `86c4d1b`, recorded in [macOS RouterOS parity baseline](macos-routeros-parity.md).
 - UI and product workflows follow the released Apple application where platform-neutral. Tunnel execution and Windows security boundaries follow the inherited Windows engine.
 
 The inherited manager service, legacy UI, and updater remain compatibility/source heritage. They are not installed or invoked by the standard WireRoute product path.
@@ -86,6 +86,9 @@ Connection history is local, limited to the newest 1000 sessions, and purged acc
 - X25519 keys are generated locally through Windows cryptography APIs.
 - The private key is never sent to RouterOS.
 - Peer creation changes only one `/interface/wireguard/peers` resource after explicit review.
+- Missing-profile recovery generates a replacement private key locally, reconstructs an editable client profile, and PATCHes only the selected peer's `public-key` after explicit review. The old private key cannot be recovered.
+- Recovery records include the saved RouterOS connection ID, peer ID, original and replacement public keys, stable local profile ID, tunnel name, and complete private configuration. The entire record is DPAPI-protected.
+- Resume verifies the protected key pair, distinguishes original/replaced/conflicting RouterOS keys, and imports only after the replacement is confirmed.
 - The default list includes only peers whose comment is `Managed by WireRoute`; `Show all peers` reveals other peers.
 
 See [macOS RouterOS parity baseline](macos-routeros-parity.md) and [RouterOS setup](ROUTEROS_SETUP.md).

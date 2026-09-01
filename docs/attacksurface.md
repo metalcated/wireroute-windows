@@ -61,7 +61,9 @@ RouterOS management is performed from the unprivileged application over REST:
 - certificates trusted by Windows use normal platform validation; and
 - untrusted or changed certificates require an app-owned fingerprint review and are pinned to the exact host and port after approval.
 
-A timeout or transport failure after a peer-creation request is treated as an uncertain write. WireRoute protects the matching private configuration locally so the user can reconnect and reconcile state without generating an unrelated key.
+A timeout or transport failure after peer creation or a missing-profile public-key replacement is treated as an uncertain write. WireRoute protects the matching private configuration locally so the user can reconnect and reconcile state without generating an unrelated key. Missing-profile records are scoped to the saved router and exact peer, and resume refuses to write if RouterOS now contains a third public key.
+
+Missing-profile recovery cannot retrieve a lost private key. It generates a replacement in the unprivileged app, requires an exact peer `/32` or `/128`, protects the replacement configuration before mutation, and PATCHes only the selected peer's `public-key`. The review and resume paths do not modify RouterOS addresses, routes, firewall, NAT, interface keys, or other peers.
 
 RouterOS credentials grant whatever rights are assigned to that RouterOS account. Use a dedicated least-privilege account where practical and treat an approved certificate replacement as a security-sensitive action.
 

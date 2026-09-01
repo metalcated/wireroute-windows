@@ -1,6 +1,6 @@
 # macOS RouterOS parity baseline
 
-The Windows RouterOS workflow uses the released macOS implementation at Apple commit `efaba13` as its audited behavioral baseline. Platform substitutions are limited to operating-system boundaries and are recorded here so future changes can be reviewed deliberately.
+The Windows RouterOS workflow uses the released macOS implementation through Apple commit `86c4d1b` (`Recover missing RouterOS profiles`) as its audited behavioral baseline. Platform substitutions are limited to operating-system boundaries and are recorded here so future changes can be reviewed deliberately.
 
 ## Workflow that Windows preserves
 
@@ -14,6 +14,11 @@ The Windows RouterOS workflow uses the released macOS implementation at Apple co
 8. `Review RouterOS Change` shows the device, interface, client address, endpoint, and client routes. Confirmation adds exactly one peer and does not change RouterOS addresses, firewall, NAT, or routes.
 9. Only after RouterOS confirms the write does WireRoute import the matching private client configuration into its protected tunnel store, refresh the profile list, and select the new profile.
 10. A rejected 4xx write remains a normal failure. A timeout, HTTP 408, server failure, or transport interruption after submission is treated as an uncertain write. The matching private configuration remains protected for recovery while the user reconnects and verifies RouterOS.
+11. Selecting a peer with no matching local profile enables `Recover Profile…`. The original private key is not recoverable. WireRoute generates a new X25519 pair locally and reconstructs the editable profile from the peer, its interface, endpoint discovery, and saved defaults.
+12. Recovery accepts only an exact IPv4 `/32` or IPv6 `/128` already assigned to that peer. A broader routed prefix is never treated as proof of the missing client address.
+13. Recovery protects the complete replacement configuration before RouterOS is changed. Review shows the current and replacement public keys; confirmation patches only that peer's `public-key` field.
+14. An interrupted recovery is scoped by both the saved RouterOS connection identifier and RouterOS peer identifier. Resume derives the replacement public key from the protected private configuration, then reconciles it with the current peer: replace the original key, skip an already-confirmed replacement, or stop on any third-key conflict.
+15. The protected recovery is removed only after a matching local profile exists. If RouterOS succeeded but profile import failed, `Resume Recovery…` finishes the import without rotating the key again.
 
 ## Windows-native substitutions
 
@@ -36,6 +41,9 @@ The Windows implementation keeps the following audited behavior:
 - Windows certificate trust is accepted normally; manually approved certificates are pinned by DER value to an exact host and port.
 - A changed pin requires a new review showing the previous and presented SHA-256 fingerprints.
 - The peer private key exists only in the client and protected recovery/profile storage.
-- Recovery is saved before an uncertain result is exposed and is removed only after the result is reconciled or the user explicitly discards it.
+- New-peer and missing-profile recovery data is saved before RouterOS mutation and removed only after the result is reconciled.
+- Missing-profile recovery changes only one existing peer's public key. It never changes addresses, routes, firewall rules, NAT, interface keys, or another peer.
+- Pending key replacement is keyed by RouterOS connection and peer IDs so equal RouterOS resource IDs on different routers cannot collide.
+- Resume verifies that the protected private key derives the recorded replacement public key before comparing it with RouterOS.
 
 Changes to RouterOS request ordering, certificate validation, client-address inference, key handling, or uncertain-write recovery should be compared with the current Apple release and covered by both RouterOS and Storage tests.

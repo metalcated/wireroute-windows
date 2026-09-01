@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Manager;
 using WireRoute.Core.Routing;
+using WireRoute.RouterOS;
 using WireRoute.Storage;
 using WireRoute.App.Interop;
 
@@ -18,6 +20,7 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
         : this(profile, displayName: storedProfile.Name)
     {
         StoredProfile = storedProfile;
+        InterfacePublicKey = TryInterfacePublicKey(profile);
         Status = "Inactive";
         RoutingLabel = storedProfile.RouteMode == StoredTunnelRouteMode.Full ? "Full" : "Split";
     }
@@ -29,6 +32,7 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
         ManagerTunnelState managerState = ManagerTunnelState.Unknown)
     {
         Profile = profile;
+        InterfacePublicKey = TryInterfacePublicKey(profile);
         ManagerName = managerName;
         Name = displayName ?? profile.Name;
         ManagerState = managerState;
@@ -39,6 +43,7 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
     public ProfileNavigationItem(ManagerProfileSummary profile)
     {
         ManagerName = profile.Name;
+        InterfacePublicKey = profile.InterfacePublicKey;
         Name = profile.DisplayName;
         ManagerState = profile.State;
         Status = StatusText(profile.State);
@@ -67,6 +72,8 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
         set => SetField(ref routingLabel, value);
     }
 
+    public string? InterfacePublicKey { get; private set; }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     internal string? ManagerName { get; }
@@ -91,6 +98,7 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
     {
         StoredProfile = storedProfile;
         Profile = profile;
+        InterfacePublicKey = TryInterfacePublicKey(profile);
         Name = storedProfile.Name;
         RoutingLabel = storedProfile.RouteMode == StoredTunnelRouteMode.Full ? "Full" : "Split";
     }
@@ -99,6 +107,14 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
     {
         ManagerState = state;
         Status = StatusText(state);
+    }
+
+    internal void UpdateSummary(ManagerProfileSummary profile)
+    {
+        InterfacePublicKey = profile.InterfacePublicKey;
+        Name = profile.DisplayName;
+        RoutingLabel = profile.DetectedRouteMode == TunnelRouteMode.Full ? "Full" : "Split";
+        UpdateState(profile.State);
     }
 
     internal void UpdateState(LocalTunnelState state)
@@ -122,6 +138,19 @@ public sealed class ProfileNavigationItem : INotifyPropertyChanged
         ManagerTunnelState.Stopped => "Disconnected",
         _ => "Status unavailable",
     };
+
+    private static string? TryInterfacePublicKey(WireGuardProfile profile)
+    {
+        try
+        {
+            return WireGuardKeyPair.FromPrivateKey(
+                WireGuardConfigFormatter.PrivateKey(profile)).PublicKey;
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
 
     private void SetField(
         ref string field,

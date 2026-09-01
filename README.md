@@ -28,7 +28,7 @@ Free code signing provided by [SignPath.io](https://signpath.io/), certificate b
 - Protected WireGuard profile import, ZIP import/export, creation, editing, QR display, and key copy.
 - Split and Full routing, profile DNS, service-free encrypted DNS, private-IP exclusion, and Ethernet/Wi-Fi on-demand rules.
 - Demand-start WireGuardNT tunnel activation with live transfer rates, handshakes, bounded native logs, and protected activity history.
-- RouterOS HTTPS connection storage, certificate pin review, read-only discovery, managed-peer filtering, client-address suggestions, reviewed peer creation, and automatic local profile import.
+- RouterOS HTTPS connection storage, certificate pin review, read-only discovery, managed-peer filtering, client-address suggestions, reviewed peer creation, automatic local profile import, and resumable lost-private-key recovery for existing peers.
 - A persistent Windows notification icon, close-to-tray behavior, a macOS-matched context menu, Blue Nordic/System themes, and selectable icon styles.
 - Self-contained portable ZIPs and per-machine MSI installers for x64 and ARM64.
 

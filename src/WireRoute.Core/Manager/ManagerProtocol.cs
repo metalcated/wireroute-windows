@@ -150,7 +150,8 @@ public sealed record ManagerProfileSummary(
     string Name,
     string DisplayName,
     ManagerTunnelState State,
-    TunnelRouteMode DetectedRouteMode);
+    TunnelRouteMode DetectedRouteMode,
+    string? InterfacePublicKey = null);
 
 public sealed record ManagerGetProfileRequest(string Name);
 

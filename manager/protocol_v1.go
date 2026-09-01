@@ -93,10 +93,11 @@ type managerV1HelloResponse struct {
 }
 
 type managerV1ProfileSummary struct {
-	Name              string `json:"name"`
-	DisplayName       string `json:"displayName"`
-	State             string `json:"state"`
-	DetectedRouteMode string `json:"detectedRouteMode"`
+	Name               string `json:"name"`
+	DisplayName        string `json:"displayName"`
+	State              string `json:"state"`
+	DetectedRouteMode  string `json:"detectedRouteMode"`
+	InterfacePublicKey string `json:"interfacePublicKey"`
 }
 
 type managerV1ListProfilesResponse struct {
@@ -437,6 +438,7 @@ func managerV1Summary(config *conf.Config, state TunnelState) managerV1ProfileSu
 		managerV1DisplayName(config),
 		managerV1State(state),
 		managerV1RouteMode(config),
+		config.Interface.PrivateKey.Public().String(),
 	}
 }
 

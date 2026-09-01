@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using WireRoute.App.Models;
 using WireRoute.Core.Profiles;
 using WireRoute.Core.Routing;
 using WireRoute.RouterOS;
@@ -14,6 +15,144 @@ namespace WireRoute.App;
 public sealed partial class MainWindow
 {
     private readonly RouterOSProfileRecoveryStore routerOSProfileRecoveryStore = new();
+    private IReadOnlyList<RouterOSProfileRecovery> routerOSProfileRecoveries = [];
+
+    private async Task RefreshRouterOSProfileRecoveriesAsync()
+    {
+        try
+        {
+            routerOSProfileRecoveries = await routerOSProfileRecoveryStore.LoadAllAsync();
+        }
+        catch
+        {
+            routerOSProfileRecoveries = [];
+        }
+
+        UpdateRouterOSRecoveryAction();
+    }
+
+    private void UpdateRouterOSRecoveryAction()
+    {
+        if (RouterOSRecoverProfileButton is null)
+        {
+            return;
+        }
+
+        var peer = (RouterOSDiscoveryList.SelectedItem as Models.RouterOSDiscoveryRow)?.Peer;
+        var context = routerOSConnectedContext;
+        var pending = peer is null || context is null
+            ? null
+            : PendingRouterOSProfileRecovery(context.Connection.Id, peer.Id);
+        var matchingProfile = peer is null ? null : ProfileMatchingRouterOSPeer(peer);
+        var profileKeyUnavailable = Profiles.Any(value =>
+            string.IsNullOrWhiteSpace(value.InterfacePublicKey));
+        RouterOSRecoverProfileButton.Content = pending is null
+            ? "Recover Profile…"
+            : "Resume Recovery…";
+        RouterOSRecoverProfileButton.IsEnabled = context is not null
+            && peer is not null
+            && !isRouterOSBusy
+            && matchingProfile is null
+            && !profileKeyUnavailable
+            && RouterOSPeerCreation.IsWireGuardKey(peer.PublicKey);
+        ToolTipService.SetToolTip(
+            RouterOSRecoverProfileButton,
+            context is null
+                ? "Connect to a RouterOS device first."
+                : peer is null
+                    ? "Select the RouterOS peer whose local private profile was lost."
+                    : matchingProfile is not null
+                        ? $"WireRoute already has the matching profile ‘{matchingProfile.Name}’."
+                        : profileKeyUnavailable
+                            ? "At least one loaded profile does not expose a verifiable public key. Repair it, or update and restart an older tunnel manager, before recovering a peer."
+                            : pending is not null
+                                ? "Continue the protected recovery already prepared for this router and peer."
+                                : !RouterOSPeerCreation.IsWireGuardKey(peer.PublicKey)
+                                    ? "RouterOS did not return a valid WireGuard public key for this peer."
+                                    : "Generate a replacement key locally, update only this peer’s public key, and restore its WireRoute profile.");
+    }
+
+    private RouterOSProfileRecovery? PendingRouterOSProfileRecovery(Guid connectionId, string peerId) =>
+        routerOSProfileRecoveries
+            .Where(value => value.IsPeerKeyReplacement
+                && value.RouterConnectionId == connectionId
+                && value.RouterPeerId?.Equals(peerId, StringComparison.Ordinal) == true)
+            .OrderByDescending(value => value.CreatedAt)
+            .FirstOrDefault();
+
+    private ProfileNavigationItem? ProfileMatchingRouterOSPeer(RouterOSWireGuardPeer peer) =>
+        Profiles.FirstOrDefault(value =>
+            value.InterfacePublicKey?.Equals(peer.PublicKey, StringComparison.Ordinal) == true);
+
+    private async void RouterOSRecoverProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (routerOSConnectedContext is not { } context
+            || (RouterOSDiscoveryList.SelectedItem as Models.RouterOSDiscoveryRow)?.Peer is not { } peer)
+        {
+            return;
+        }
+
+        var pending = PendingRouterOSProfileRecovery(context.Connection.Id, peer.Id);
+        if (pending is not null)
+        {
+            await ResumeRouterOSProfileRecoveryAsync(peer, pending);
+            return;
+        }
+
+        if (ProfileMatchingRouterOSPeer(peer) is { } existing)
+        {
+            await ShowMessageAsync(
+                "Profile already available",
+                $"‘{existing.Name}’ already contains the private key matching this RouterOS peer.");
+            UpdateRouterOSRecoveryAction();
+            return;
+        }
+
+        var routerInterface = routerOSInterfaces.FirstOrDefault(value =>
+            value.Name.Equals(peer.InterfaceName, StringComparison.Ordinal));
+        if (routerInterface is null)
+        {
+            await ShowMessageAsync(
+                "Peer interface is unavailable",
+                $"RouterOS interface {peer.InterfaceName} is not present in the current discovery results. Refresh the connection and try again.");
+            return;
+        }
+
+        WireGuardKeyPair keyPair;
+        try
+        {
+            keyPair = WireGuardKeyPair.Generate();
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync("Replacement key could not be generated", exception.Message);
+            return;
+        }
+
+        var state = CreateInitialRecoveryState(context.Connection, peer, routerInterface);
+        while (true)
+        {
+            var proposal = await ShowRouterOSPeerSetupAsync(state, keyPair, peer);
+            if (proposal is null)
+            {
+                return;
+            }
+
+            var review = await ShowRouterOSPeerReviewAsync(proposal);
+            if (review == WireRouteModalResult.Secondary)
+            {
+                continue;
+            }
+
+            if (review != WireRouteModalResult.Primary)
+            {
+                return;
+            }
+
+            await BeginRouterOSProfileRecoveryAsync(proposal);
+            return;
+        }
+    }
 
     private async void RouterOSSetUpPeerButton_Click(object sender, RoutedEventArgs e)
     {
@@ -81,10 +220,43 @@ public sealed partial class MainWindow
         };
     }
 
+    private RouterOSPeerSetupState CreateInitialRecoveryState(
+        RouterOSStoredConnection connection,
+        RouterOSWireGuardPeer peer,
+        RouterOSWireGuardInterface routerInterface)
+    {
+        var address = RouterOSMissingProfileRecoveryValidator.SuggestedClientAddress(peer)?.Notation;
+        var peerName = peer.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(peerName)
+            && !RouterOSPeerCreation.IsWireRouteManagedComment(peer.Comment))
+        {
+            peerName = peer.Comment?.Trim();
+        }
+
+        return new RouterOSPeerSetupState
+        {
+            InterfaceName = routerInterface.Name,
+            Name = string.IsNullOrWhiteSpace(peerName) ? "Recovered Profile" : peerName,
+            ClientAddress = address ?? string.Empty,
+            LastSuggestedClientAddress = address,
+            EndpointAddress = string.IsNullOrWhiteSpace(appSettings.PreferredEndpoint)
+                ? routerOSPublicEndpointSuggestion?.Address ?? string.Empty
+                : appSettings.PreferredEndpoint,
+            EndpointPort = routerInterface.ListenPort?.ToString() ?? string.Empty,
+            LastSuggestedEndpointPort = routerInterface.ListenPort?.ToString(),
+            DnsServers = appSettings.DnsServers,
+            RouteModeIndex = string.IsNullOrWhiteSpace(appSettings.SplitTunnelRoutes) ? 1 : 0,
+            Routes = appSettings.SplitTunnelRoutes,
+            PersistentKeepalive = appSettings.PersistentKeepalive.ToString(),
+        };
+    }
+
     private async Task<RouterOSPeerSetupProposal?> ShowRouterOSPeerSetupAsync(
         RouterOSPeerSetupState state,
-        WireGuardKeyPair keyPair)
+        WireGuardKeyPair keyPair,
+        RouterOSWireGuardPeer? recoveryPeer = null)
     {
+        var isRecovery = recoveryPeer is not null;
         var interfacePicker = new ComboBox
         {
             DisplayMemberPath = "Name",
@@ -93,6 +265,7 @@ public sealed partial class MainWindow
         };
         interfacePicker.SelectedItem = routerOSInterfaces.FirstOrDefault(value =>
             value.Name.Equals(state.InterfaceName, StringComparison.Ordinal));
+        interfacePicker.IsEnabled = !isRecovery;
         var nameField = new TextBox
         {
             PlaceholderText = "Laptop",
@@ -181,12 +354,24 @@ public sealed partial class MainWindow
             var currentAddress = addressField.Text.Trim();
             if (currentAddress.Length == 0 || currentAddress == state.LastSuggestedClientAddress)
             {
-                var suggestion = RouterOSClientAddressSuggestion.Discover(selected.Name, routerOSPeers);
-                state.LastSuggestedClientAddress = suggestion?.Address.Notation;
-                addressField.Text = suggestion?.Address.Notation ?? string.Empty;
-                addressHelp.Text = suggestion is null
-                    ? $"No unambiguous /32 could be suggested for {selected.Name}. Enter the client address manually."
-                    : $"Suggested from existing /32 peers on {selected.Name}. Verify it before continuing.";
+                if (recoveryPeer is null)
+                {
+                    var suggestion = RouterOSClientAddressSuggestion.Discover(selected.Name, routerOSPeers);
+                    state.LastSuggestedClientAddress = suggestion?.Address.Notation;
+                    addressField.Text = suggestion?.Address.Notation ?? string.Empty;
+                    addressHelp.Text = suggestion is null
+                        ? $"No unambiguous /32 could be suggested for {selected.Name}. Enter the client address manually."
+                        : $"Suggested from existing /32 peers on {selected.Name}. Verify it before continuing.";
+                }
+                else
+                {
+                    var suggestion = RouterOSMissingProfileRecoveryValidator.SuggestedClientAddress(recoveryPeer);
+                    state.LastSuggestedClientAddress = suggestion?.Notation;
+                    addressField.Text = suggestion?.Notation ?? string.Empty;
+                    addressHelp.Text = suggestion is null
+                        ? "This peer has zero or multiple exact host addresses. Enter the correct /32 or /128 from its RouterOS allowed-address entries."
+                        : "Restored from this peer’s exact RouterOS /32 or /128 host address.";
+                }
             }
             else
             {
@@ -277,7 +462,9 @@ public sealed partial class MainWindow
         form.Children.Add(new TextBlock
         {
             Foreground = (Brush)Application.Current.Resources["NordicSecondaryTextBrush"],
-            Text = "WireRoute generated this device’s private key locally. It will never be sent to RouterOS.",
+            Text = isRecovery
+                ? "The original private key cannot be recovered. WireRoute generated a replacement locally; only its public key can be sent to RouterOS."
+                : "WireRoute generated this device’s private key locally. It will never be sent to RouterOS.",
             TextWrapping = TextWrapping.Wrap,
         });
         form.Children.Add(formGrid);
@@ -286,28 +473,44 @@ public sealed partial class MainWindow
         ModalRequest? request = null;
         request = new ModalRequest
         {
-            Title = "Set Up a Device",
-            Subtitle = "WireRoute generates a fresh key pair locally, suggests safe values from RouterOS, prefills your defaults, and lets you review the exact change.",
+            Title = isRecovery ? "Recover Missing Profile" : "Set Up a Device",
+            Subtitle = isRecovery
+                ? "Rebuild the local profile from RouterOS, review it, then replace only this peer’s public key."
+                : "WireRoute generates a fresh key pair locally, suggests safe values from RouterOS, prefills your defaults, and lets you review the exact change.",
             Content = ModalCard(form),
-            PrimaryText = "Review Peer",
+            PrimaryText = isRecovery ? "Review Recovery" : "Review Peer",
             CancelText = "Cancel",
             MaxWidth = 960,
             OnPrimary = () =>
             {
                 try
                 {
-                    proposal = MakeRouterOSPeerProposal(
-                        state,
-                        keyPair,
-                        interfacePicker.SelectedItem as RouterOSWireGuardInterface,
-                        nameField.Text,
-                        addressField.Text,
-                        endpointField.Text,
-                        endpointPortField.Text,
-                        dnsField.Text,
-                        routeModeIndex,
-                        routesField.Text,
-                        keepaliveField.Text);
+                    proposal = recoveryPeer is null
+                        ? MakeRouterOSPeerProposal(
+                            state,
+                            keyPair,
+                            interfacePicker.SelectedItem as RouterOSWireGuardInterface,
+                            nameField.Text,
+                            addressField.Text,
+                            endpointField.Text,
+                            endpointPortField.Text,
+                            dnsField.Text,
+                            routeModeIndex,
+                            routesField.Text,
+                            keepaliveField.Text)
+                        : MakeRouterOSRecoveryProposal(
+                            state,
+                            keyPair,
+                            recoveryPeer,
+                            interfacePicker.SelectedItem as RouterOSWireGuardInterface,
+                            nameField.Text,
+                            addressField.Text,
+                            endpointField.Text,
+                            endpointPortField.Text,
+                            dnsField.Text,
+                            routeModeIndex,
+                            routesField.Text,
+                            keepaliveField.Text);
                     return Task.FromResult(true);
                 }
                 catch (Exception exception)
@@ -394,6 +597,91 @@ public sealed partial class MainWindow
         state.PersistentKeepalive = persistentKeepaliveText;
         return new RouterOSPeerSetupProposal(
             peerCreation,
+            null,
+            keyPair.PublicKey,
+            clientConfiguration,
+            profileId,
+            tunnelName);
+    }
+
+    private RouterOSPeerSetupProposal MakeRouterOSRecoveryProposal(
+        RouterOSPeerSetupState state,
+        WireGuardKeyPair keyPair,
+        RouterOSWireGuardPeer recoveryPeer,
+        RouterOSWireGuardInterface? selectedInterface,
+        string name,
+        string clientAddress,
+        string endpointAddress,
+        string endpointPortText,
+        string dnsServers,
+        int routeModeIndex,
+        string routes,
+        string persistentKeepaliveText)
+    {
+        if (selectedInterface is null)
+        {
+            throw new ArgumentException("The peer’s WireGuard interface is unavailable.");
+        }
+
+        var recoveredAddress = RouterOSMissingProfileRecoveryValidator.Validate(
+            recoveryPeer,
+            selectedInterface,
+            clientAddress);
+        if (!int.TryParse(endpointPortText.Trim(), out var endpointPort))
+        {
+            throw new RouterOSProvisioningException(
+                RouterOSProvisioningError.InvalidEndpointPort,
+                "The endpoint port must be between 1 and 65535.");
+        }
+
+        if (!int.TryParse(persistentKeepaliveText.Trim(), out var persistentKeepalive))
+        {
+            throw new RouterOSProvisioningException(
+                RouterOSProvisioningError.InvalidPersistentKeepalive,
+                "Persistent keepalive must be between 0 and 65535 seconds.");
+        }
+
+        if (keyPair.PublicKey.Equals(recoveryPeer.PublicKey, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Generate a different replacement key before continuing.");
+        }
+
+        var displayName = name.Trim();
+        if (Profiles.Any(item => WireRouteStoredProfile.DisplayNamesEqual(item.Name, displayName)))
+        {
+            throw new ArgumentException($"A WireRoute profile named ‘{displayName}’ already exists.");
+        }
+
+        var allowedIps = routeModeIndex == 1
+            ? new[] { recoveredAddress.Family == IpFamily.Ipv4 ? "0.0.0.0/0" : "::/0" }
+            : SplitSetupValues(routes);
+        var clientConfiguration = new WireGuardClientConfiguration(
+            displayName,
+            keyPair.PrivateKey,
+            recoveredAddress.Notation,
+            SplitSetupValues(dnsServers),
+            selectedInterface.PublicKey,
+            endpointAddress,
+            endpointPort,
+            allowedIps,
+            persistentKeepalive);
+        var profileId = Guid.NewGuid();
+        var tunnelName = WireRouteStoredProfile.CreateTunnelName(clientConfiguration.Name, profileId);
+        _ = WireGuardConfigParser.Parse(clientConfiguration.WgQuickConfiguration, tunnelName);
+
+        state.InterfaceName = selectedInterface.Name;
+        state.Name = name;
+        state.ClientAddress = clientAddress;
+        state.EndpointAddress = endpointAddress;
+        state.EndpointPort = endpointPortText;
+        state.DnsServers = dnsServers;
+        state.RouteModeIndex = routeModeIndex;
+        state.Routes = routes;
+        state.PersistentKeepalive = persistentKeepaliveText;
+        return new RouterOSPeerSetupProposal(
+            null,
+            recoveryPeer,
+            keyPair.PublicKey,
             clientConfiguration,
             profileId,
             tunnelName);
@@ -401,37 +689,341 @@ public sealed partial class MainWindow
 
     private Task<WireRouteModalResult> ShowRouterOSPeerReviewAsync(RouterOSPeerSetupProposal proposal)
     {
+        var recoveryPeer = proposal.RecoveryPeer;
+        var peerCreation = proposal.PeerCreation;
         var content = new StackPanel { Spacing = 10 };
         content.Children.Add(new TextBlock
         {
-            Text = "WireRoute will add exactly one WireGuard peer. It will not change RouterOS addresses, routes, firewall rules, or NAT.",
+            Text = recoveryPeer is null
+                ? "WireRoute will add exactly one WireGuard peer. It will not change RouterOS addresses, routes, firewall rules, or NAT."
+                : "WireRoute will replace only this peer’s public key. It will not change RouterOS addresses, routes, firewall rules, NAT, or any other peer.",
             TextWrapping = TextWrapping.Wrap,
         });
-        content.Children.Add(ReviewDetail("Device", proposal.PeerCreation.Name));
-        content.Children.Add(ReviewDetail("Interface", proposal.PeerCreation.InterfaceName));
-        content.Children.Add(ReviewDetail("Client address", proposal.PeerCreation.ClientAddress.Notation));
+        content.Children.Add(ReviewDetail("Device", proposal.ClientConfiguration.Name));
+        content.Children.Add(ReviewDetail(
+            "Interface",
+            recoveryPeer?.InterfaceName ?? peerCreation?.InterfaceName ?? "—"));
+        content.Children.Add(ReviewDetail(
+            "Client address",
+            proposal.ClientConfiguration.ClientAddress.Notation));
         content.Children.Add(ReviewDetail(
             "Endpoint",
             $"{proposal.ClientConfiguration.EndpointAddress}:{proposal.ClientConfiguration.EndpointPort}"));
         content.Children.Add(ReviewDetail(
             "Client routes",
             string.Join(", ", proposal.ClientConfiguration.AllowedIps.Select(value => value.Notation))));
+        if (recoveryPeer is not null)
+        {
+            content.Children.Add(ReviewDetail("Current peer key", recoveryPeer.PublicKey));
+            content.Children.Add(ReviewDetail("Replacement key", proposal.ClientPublicKey));
+        }
         return ShowModalAsync(new ModalRequest
         {
-            Title = "Review RouterOS Peer",
-            Subtitle = "Confirm the exact RouterOS change and matching local WireGuard profile.",
+            Title = recoveryPeer is null ? "Review RouterOS Peer" : "Review Profile Recovery",
+            Subtitle = recoveryPeer is null
+                ? "Confirm the exact RouterOS change and matching local WireGuard profile."
+                : "Confirm the replacement profile and the only field WireRoute will change on RouterOS.",
             Content = ModalCard(content),
-            PrimaryText = "Add Peer",
+            PrimaryText = recoveryPeer is null ? "Add Peer" : "Recover Profile",
             SecondaryText = "Back",
             CancelText = "Cancel",
             MaxWidth = 760,
         });
     }
 
-    private async Task CreateRouterOSPeerAndImportAsync(RouterOSPeerSetupProposal proposal)
+    private async Task BeginRouterOSProfileRecoveryAsync(RouterOSPeerSetupProposal proposal)
     {
         var context = routerOSConnectedContext;
-        if (context is null || !Uri.TryCreate(context.Connection.Url, UriKind.Absolute, out var url))
+        var peer = proposal.RecoveryPeer;
+        if (context is null || peer is null)
+        {
+            return;
+        }
+
+        var recovery = new RouterOSProfileRecovery(
+            Guid.NewGuid(),
+            proposal.ClientConfiguration.Name,
+            proposal.ClientConfiguration.WgQuickConfiguration,
+            DateTimeOffset.UtcNow,
+            RouterOSProfileRecoveryReason.PendingRouterKeyReplacement)
+        {
+            RouterConnectionId = context.Connection.Id,
+            RouterPeerId = peer.Id,
+            OriginalPeerPublicKey = peer.PublicKey,
+            ReplacementPublicKey = proposal.ClientPublicKey,
+            ProfileId = proposal.ProfileId,
+            TunnelName = proposal.TunnelName,
+        };
+        try
+        {
+            await routerOSProfileRecoveryStore.SaveAsync(recovery);
+            await RefreshRouterOSProfileRecoveriesAsync();
+        }
+        catch (Exception exception)
+        {
+            await ShowMessageAsync(
+                "Profile recovery was stopped safely",
+                $"The replacement configuration could not be protected before changing RouterOS. No router changes were made.\n\n{exception.Message}");
+            return;
+        }
+
+        await ContinueRouterOSProfileRecoveryAsync(peer, recovery);
+    }
+
+    private async Task ResumeRouterOSProfileRecoveryAsync(
+        RouterOSWireGuardPeer selectedPeer,
+        RouterOSProfileRecovery recovery)
+    {
+        if (routerOSConnectedContext is not { } context
+            || recovery.RouterConnectionId != context.Connection.Id
+            || recovery.RouterPeerId?.Equals(selectedPeer.Id, StringComparison.Ordinal) != true
+            || recovery.ProfileId is null
+            || string.IsNullOrWhiteSpace(recovery.TunnelName)
+            || !RouterOSPeerCreation.IsWireGuardKey(recovery.OriginalPeerPublicKey ?? string.Empty)
+            || !RouterOSPeerCreation.IsWireGuardKey(recovery.ReplacementPublicKey ?? string.Empty))
+        {
+            await ShowConfigurationRecoveryAsync(
+                recovery,
+                "Recovery metadata needs attention",
+                "This protected recovery does not contain complete router and peer identity metadata, so WireRoute will not change RouterOS automatically.");
+            return;
+        }
+
+        var originalPeerPublicKey = recovery.OriginalPeerPublicKey!;
+        var replacementPublicKey = recovery.ReplacementPublicKey!;
+
+        try
+        {
+            var parsed = WireGuardConfigParser.Parse(
+                recovery.WgQuickConfiguration,
+                recovery.TunnelName);
+            var derivedKey = WireGuardKeyPair.FromPrivateKey(
+                WireGuardConfigFormatter.PrivateKey(parsed)).PublicKey;
+            if (!derivedKey.Equals(replacementPublicKey, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The protected profile does not match its recorded replacement public key.");
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowConfigurationRecoveryAsync(
+                recovery,
+                "Protected recovery could not be verified",
+                $"WireRoute will not change RouterOS because the retained profile failed integrity validation. {exception.Message}");
+            return;
+        }
+
+        if (Profiles.FirstOrDefault(value =>
+                value.InterfacePublicKey?.Equals(
+                    recovery.ReplacementPublicKey,
+                    StringComparison.Ordinal) == true) is { } matchingProfile)
+        {
+            var cleanupMessage = await TryDeleteProfileRecoveryAsync(recovery.Id);
+            SetRouterOSStatus(
+                $"Recovery is already complete in profile ‘{matchingProfile.Name}’.{cleanupMessage}",
+                isSuccess: cleanupMessage.Length == 0);
+            return;
+        }
+
+        var currentPeer = routerOSPeers.FirstOrDefault(value =>
+            value.Id.Equals(selectedPeer.Id, StringComparison.Ordinal)) ?? selectedPeer;
+        var keyState = RouterOSPeerKeyRecoveryReconciler.Reconcile(
+            currentPeer.PublicKey,
+            originalPeerPublicKey,
+            replacementPublicKey);
+        if (keyState == RouterOSPeerKeyRecoveryState.Conflict)
+        {
+            var updated = recovery with
+            {
+                Reason = RouterOSProfileRecoveryReason.RouterKeyReplacementUncertain,
+            };
+            var storageMessage = await TrySaveProfileRecoveryAsync(updated);
+            await ShowConfigurationRecoveryAsync(
+                updated,
+                "RouterOS peer key changed",
+                $"This peer now has a third public key that matches neither the original nor the protected replacement. WireRoute made no changes. Reconcile the peer manually before resuming.{storageMessage}");
+            return;
+        }
+
+        var routerHasReplacementKey = keyState == RouterOSPeerKeyRecoveryState.ReplacementConfirmed;
+
+        if (Profiles.Any(value =>
+                WireRouteStoredProfile.DisplayNamesEqual(value.Name, recovery.DisplayName)
+                && value.InterfacePublicKey?.Equals(
+                    recovery.ReplacementPublicKey,
+                    StringComparison.Ordinal) != true))
+        {
+            await ShowConfigurationRecoveryAsync(
+                recovery,
+                "Profile name is now in use",
+                $"Another profile named ‘{recovery.DisplayName}’ exists. WireRoute made no RouterOS changes; save the protected configuration and resolve the name conflict before retrying.");
+            return;
+        }
+
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock
+        {
+            Text = routerHasReplacementKey
+                ? "RouterOS already has the protected replacement public key. WireRoute will leave the router unchanged and finish importing the matching private profile."
+                : "RouterOS still has the original public key. WireRoute will replace only that key, verify the response, and import the matching private profile.",
+            TextWrapping = TextWrapping.Wrap,
+        });
+        content.Children.Add(ReviewDetail("Peer", FirstNonempty(currentPeer.Name, currentPeer.Comment) ?? currentPeer.Id));
+        content.Children.Add(ReviewDetail("Profile", recovery.DisplayName));
+        content.Children.Add(ReviewDetail("Current peer key", currentPeer.PublicKey));
+        content.Children.Add(ReviewDetail("Protected key", replacementPublicKey));
+        var result = await ShowModalAsync(new ModalRequest
+        {
+            Title = "Resume Profile Recovery",
+            Subtitle = "WireRoute reconciled the protected recovery with the current RouterOS peer before offering this action.",
+            Content = ModalCard(content),
+            PrimaryText = routerHasReplacementKey ? "Finish Recovery" : "Resume Recovery",
+            CancelText = "Cancel",
+            MaxWidth = 780,
+        });
+        if (result == WireRouteModalResult.Primary)
+        {
+            await ContinueRouterOSProfileRecoveryAsync(currentPeer, recovery);
+        }
+    }
+
+    private async Task ContinueRouterOSProfileRecoveryAsync(
+        RouterOSWireGuardPeer selectedPeer,
+        RouterOSProfileRecovery recovery)
+    {
+        var context = routerOSConnectedContext;
+        if (context is null
+            || !Uri.TryCreate(context.Connection.Url, UriKind.Absolute, out var url)
+            || recovery.ProfileId is not { } profileId
+            || string.IsNullOrWhiteSpace(recovery.TunnelName)
+            || !RouterOSPeerCreation.IsWireGuardKey(recovery.OriginalPeerPublicKey ?? string.Empty)
+            || !RouterOSPeerCreation.IsWireGuardKey(recovery.ReplacementPublicKey ?? string.Empty))
+        {
+            return;
+        }
+
+        var originalPeerPublicKey = recovery.OriginalPeerPublicKey!;
+        var replacementPublicKey = recovery.ReplacementPublicKey!;
+
+        var peer = routerOSPeers.FirstOrDefault(value =>
+            value.Id.Equals(selectedPeer.Id, StringComparison.Ordinal)) ?? selectedPeer;
+        var keyState = RouterOSPeerKeyRecoveryReconciler.Reconcile(
+            peer.PublicKey,
+            originalPeerPublicKey,
+            replacementPublicKey);
+        if (keyState == RouterOSPeerKeyRecoveryState.Conflict)
+        {
+            await ShowConfigurationRecoveryAsync(
+                recovery,
+                "RouterOS peer key changed",
+                "The selected peer no longer matches the original or replacement recovery key. WireRoute made no changes.");
+            return;
+        }
+
+        SetRouterOSBusy(true);
+        var confirmedPeer = peer;
+        try
+        {
+            if (keyState == RouterOSPeerKeyRecoveryState.RequiresReplacement)
+            {
+                SetRouterOSStatus("Replacing the reviewed RouterOS peer public key…");
+                try
+                {
+                    using var transport = new RouterOSHttpTransport(url, context.TrustedCertificate);
+                    var client = new RouterOSClient(
+                        url,
+                        new RouterOSCredentials(context.Connection.Username, context.Connection.Password),
+                        transport);
+                    confirmedPeer = await client.ReplaceWireGuardPeerPublicKeyAsync(
+                        peer,
+                        replacementPublicKey);
+                    if (!confirmedPeer.Id.Equals(peer.Id, StringComparison.Ordinal)
+                        || !confirmedPeer.PublicKey.Equals(
+                            replacementPublicKey,
+                            StringComparison.Ordinal))
+                    {
+                        throw new RouterOSWriteOutcomeUncertainException(
+                            new InvalidDataException(
+                                "RouterOS did not confirm the selected peer and replacement key."));
+                    }
+                }
+                catch (RouterOSHttpException exception) when (
+                    (int)exception.StatusCode is >= 400 and < 500
+                    && exception.StatusCode != System.Net.HttpStatusCode.RequestTimeout)
+                {
+                    var cleanupMessage = await TryDeleteProfileRecoveryAsync(recovery.Id);
+                    SetRouterOSStatus($"{exception.Message}{cleanupMessage}", isError: true);
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    var uncertain = recovery with
+                    {
+                        Reason = RouterOSProfileRecoveryReason.RouterKeyReplacementUncertain,
+                    };
+                    var storageMessage = await TrySaveProfileRecoveryAsync(uncertain);
+                    InvalidateRouterOSDiscovery(exception.Message);
+                    await ShowConfigurationRecoveryAsync(
+                        uncertain,
+                        "RouterOS key replacement needs verification",
+                        $"The peer may already have the replacement key. Reconnect and select the same peer to resume safely; do not start a second recovery. The private configuration remains protected.{storageMessage}");
+                    return;
+                }
+
+                routerOSPeers = routerOSPeers
+                    .Select(value => value.Id.Equals(confirmedPeer.Id, StringComparison.Ordinal)
+                        ? confirmedPeer
+                        : value)
+                    .ToArray();
+                RebuildRouterOSDiscovery();
+            }
+
+            SetRouterOSStatus("RouterOS confirmed the replacement key. Importing the matching private profile…");
+            try
+            {
+                _ = await ImportGeneratedProfileAsync(
+                    recovery.DisplayName,
+                    recovery.WgQuickConfiguration,
+                    profileId,
+                    recovery.TunnelName);
+                var cleanupMessage = await TryDeleteProfileRecoveryAsync(recovery.Id);
+                SetRouterOSStatus(
+                    $"Profile recovered and matched to the RouterOS peer.{cleanupMessage}",
+                    isSuccess: cleanupMessage.Length == 0);
+                if (cleanupMessage.Length > 0)
+                {
+                    await ShowMessageAsync(
+                        "Profile recovered with a cleanup notice",
+                        $"The peer and local profile are ready, but the protected recovery copy could not be cleared. {cleanupMessage}");
+                }
+            }
+            catch (Exception exception)
+            {
+                var importRecovery = recovery with
+                {
+                    Reason = RouterOSProfileRecoveryReason.ManagerImportFailed,
+                };
+                var storageMessage = await TrySaveProfileRecoveryAsync(importRecovery);
+                await ShowConfigurationRecoveryAsync(
+                    importRecovery,
+                    "RouterOS updated; profile import needs attention",
+                    $"RouterOS confirmed the replacement key, but WireRoute could not import its private profile. Select this peer and Resume Recovery after the import issue is resolved. {exception.Message}{storageMessage}");
+            }
+        }
+        finally
+        {
+            SetRouterOSBusy(false);
+        }
+    }
+
+    private async Task CreateRouterOSPeerAndImportAsync(RouterOSPeerSetupProposal proposal)
+    {
+        var peerCreation = proposal.PeerCreation;
+        var context = routerOSConnectedContext;
+        if (peerCreation is null
+            || context is null
+            || !Uri.TryCreate(context.Connection.Url, UriKind.Absolute, out var url))
         {
             return;
         }
@@ -463,7 +1055,7 @@ public sealed partial class MainWindow
                 url,
                 new RouterOSCredentials(context.Connection.Username, context.Connection.Password),
                 transport);
-            var createdPeer = await client.CreateWireGuardPeerAsync(proposal.PeerCreation);
+            var createdPeer = await client.CreateWireGuardPeerAsync(peerCreation);
             routerOSPeers = routerOSPeers.Append(createdPeer).ToArray();
             RebuildRouterOSDiscovery();
             SetRouterOSStatus("RouterOS confirmed the peer. Importing its matching profile…");
@@ -531,6 +1123,7 @@ public sealed partial class MainWindow
         try
         {
             await routerOSProfileRecoveryStore.SaveAsync(recovery);
+            await RefreshRouterOSProfileRecoveriesAsync();
             return string.Empty;
         }
         catch (Exception exception)
@@ -544,6 +1137,7 @@ public sealed partial class MainWindow
         try
         {
             await routerOSProfileRecoveryStore.DeleteAsync(id);
+            await RefreshRouterOSProfileRecoveriesAsync();
             return string.Empty;
         }
         catch (Exception exception)
@@ -650,6 +1244,9 @@ public sealed partial class MainWindow
         return rendered.Length == 0 ? "WireRoute" : rendered;
     }
 
+    private static string? FirstNonempty(params string?[] values) =>
+        values.Select(value => value?.Trim()).FirstOrDefault(value => !string.IsNullOrEmpty(value));
+
     private sealed class RouterOSPeerSetupState
     {
         public string InterfaceName { get; set; } = string.Empty;
@@ -676,7 +1273,9 @@ public sealed partial class MainWindow
     }
 
     private sealed record RouterOSPeerSetupProposal(
-        RouterOSPeerCreation PeerCreation,
+        RouterOSPeerCreation? PeerCreation,
+        RouterOSWireGuardPeer? RecoveryPeer,
+        string ClientPublicKey,
         WireGuardClientConfiguration ClientConfiguration,
         Guid ProfileId,
         string TunnelName);

@@ -288,6 +288,44 @@ public sealed class RouterOSClient
         }
     }
 
+    public async Task<RouterOSWireGuardPeer> ReplaceWireGuardPeerPublicKeyAsync(
+        RouterOSWireGuardPeer peer,
+        string publicKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(peer);
+        if (!RouterOSPeerCreation.IsWireGuardKey(publicKey))
+        {
+            throw RouterOSProvisioningErrors.Create(RouterOSProvisioningError.InvalidKey);
+        }
+
+        using var request = CreateRequest(
+            HttpMethod.Patch,
+            ["interface", "wireguard", "peers", peer.Id],
+            JsonSerializer.SerializeToUtf8Bytes(
+                new RouterOSPeerPublicKeyUpdateRequest(publicKey),
+                JsonOptions));
+        try
+        {
+            var response = await transport.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return DecodeResponse<RouterOSWireGuardPeer>(response);
+        }
+        catch (RouterOSHttpException exception) when (
+            (int)exception.StatusCode is >= 400 and < 500
+            && exception.StatusCode != HttpStatusCode.RequestTimeout)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new RouterOSWriteOutcomeUncertainException(exception);
+        }
+    }
+
     private async Task<IReadOnlyList<T>> GetAsync<T>(
         IReadOnlyList<string> pathComponents,
         CancellationToken cancellationToken)
@@ -347,4 +385,7 @@ public sealed class RouterOSClient
     private sealed record RouterOSErrorResponse(
         [property: JsonPropertyName("message")] string? Message,
         [property: JsonPropertyName("detail")] string? Detail);
+
+    private sealed record RouterOSPeerPublicKeyUpdateRequest(
+        [property: JsonPropertyName("public-key")] string PublicKey);
 }

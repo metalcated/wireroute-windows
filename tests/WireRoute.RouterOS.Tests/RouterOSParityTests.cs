@@ -156,6 +156,134 @@ public sealed class RouterOSParityTests
     }
 
     [TestMethod]
+    public async Task PeerPublicKeyReplacementPatchesOnlyTheSelectedPeer()
+    {
+        var replacementKey = Key(97);
+        var peer = Peer(
+            ["10.20.0.9/32", "192.168.0.0/16"],
+            ClientPublicKey,
+            id: "*9");
+        var transport = new QueueTransport(Response($$"""
+            {
+              ".id":"*9",
+              "interface":"wg-remote",
+              "name":"Windows Laptop",
+              "comment":"Managed by WireRoute",
+              "public-key":"{{replacementKey}}",
+              "allowed-address":"10.20.0.9/32,192.168.0.0/16",
+              "responder":"true"
+            }
+            """));
+        var client = CreateClient(transport);
+
+        var updated = await client.ReplaceWireGuardPeerPublicKeyAsync(peer, replacementKey);
+
+        Assert.AreEqual("*9", updated.Id);
+        Assert.AreEqual(replacementKey, updated.PublicKey);
+        var request = transport.Requests.Single();
+        Assert.AreEqual("PATCH", request.Method);
+        Assert.AreEqual("https://router.example/rest/interface/wireguard/peers/%2A9", request.Uri);
+        using var body = JsonDocument.Parse(request.Body!);
+        Assert.AreEqual(1, body.RootElement.EnumerateObject().Count());
+        Assert.AreEqual(replacementKey, body.RootElement.GetProperty("public-key").GetString());
+    }
+
+    [TestMethod]
+    public async Task PeerPublicKeyReplacementDistinguishesRejectedAndUncertainWrites()
+    {
+        var peer = Peer("10.20.0.9/32", ClientPublicKey);
+        var rejectedClient = CreateClient(new QueueTransport(
+            Response("""{"message":"failure","detail":"invalid key"}""", HttpStatusCode.BadRequest)));
+        var rejected = await Assert.ThrowsExactlyAsync<RouterOSHttpException>(async () =>
+            await rejectedClient.ReplaceWireGuardPeerPublicKeyAsync(peer, ServerPublicKey));
+        Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
+
+        var uncertainClient = CreateClient(new QueueTransport(
+            Response("""{"message":"failure"}""", HttpStatusCode.InternalServerError)));
+        await Assert.ThrowsExactlyAsync<RouterOSWriteOutcomeUncertainException>(async () =>
+            await uncertainClient.ReplaceWireGuardPeerPublicKeyAsync(peer, ServerPublicKey));
+    }
+
+    [TestMethod]
+    public void MissingProfileRecoveryRequiresAnExactPeerHostAddress()
+    {
+        var peer = Peer(
+            ["10.20.0.9/32", "192.168.0.0/16"],
+            ClientPublicKey);
+        var routerInterface = new RouterOSWireGuardInterface(
+            "*7",
+            "wg-remote",
+            1420,
+            51820,
+            ServerPublicKey,
+            false,
+            true);
+
+        Assert.AreEqual(
+            "10.20.0.9/32",
+            RouterOSMissingProfileRecoveryValidator.SuggestedClientAddress(peer)?.Notation);
+        Assert.AreEqual(
+            "10.20.0.9/32",
+            RouterOSMissingProfileRecoveryValidator.Validate(
+                peer,
+                routerInterface,
+                "10.20.0.9/32").Notation);
+
+        var broadRouteMatch = Assert.ThrowsExactly<RouterOSMissingProfileRecoveryException>(() =>
+            RouterOSMissingProfileRecoveryValidator.Validate(
+                peer,
+                routerInterface,
+                "192.168.1.1/32"));
+        Assert.AreEqual(
+            RouterOSMissingProfileRecoveryError.ClientAddressMismatch,
+            broadRouteMatch.Error);
+
+        var nonHostAddress = Assert.ThrowsExactly<RouterOSMissingProfileRecoveryException>(() =>
+            RouterOSMissingProfileRecoveryValidator.Validate(
+                peer,
+                routerInterface,
+                "10.20.0.0/24"));
+        Assert.AreEqual(
+            RouterOSMissingProfileRecoveryError.MissingClientAddress,
+            nonHostAddress.Error);
+    }
+
+    [TestMethod]
+    public void MissingProfileRecoveryDoesNotGuessBetweenMultipleHostAddresses()
+    {
+        var peer = Peer(
+            ["10.20.0.9/32", "2001:db8::9/128"],
+            ClientPublicKey);
+
+        Assert.IsNull(RouterOSMissingProfileRecoveryValidator.SuggestedClientAddress(peer));
+    }
+
+    [TestMethod]
+    public void MissingProfileRecoveryReconcilesOriginalReplacementAndConflictKeys()
+    {
+        var replacement = Key(97);
+
+        Assert.AreEqual(
+            RouterOSPeerKeyRecoveryState.RequiresReplacement,
+            RouterOSPeerKeyRecoveryReconciler.Reconcile(
+                ClientPublicKey,
+                ClientPublicKey,
+                replacement));
+        Assert.AreEqual(
+            RouterOSPeerKeyRecoveryState.ReplacementConfirmed,
+            RouterOSPeerKeyRecoveryReconciler.Reconcile(
+                replacement,
+                ClientPublicKey,
+                replacement));
+        Assert.AreEqual(
+            RouterOSPeerKeyRecoveryState.Conflict,
+            RouterOSPeerKeyRecoveryReconciler.Reconcile(
+                ServerPublicKey,
+                ClientPublicKey,
+                replacement));
+    }
+
+    [TestMethod]
     public void ClientRequiresTheSameSecureBaseUrlRulesAsMacOs()
     {
         var transport = new QueueTransport();
@@ -368,13 +496,20 @@ public sealed class RouterOSParityTests
     private static RouterOSWireGuardPeer Peer(
         string allowedAddress,
         string publicKey,
-        string interfaceName = "wg-remote") => new(
-            "*1",
+        string interfaceName = "wg-remote",
+        string id = "*1") => Peer([allowedAddress], publicKey, interfaceName, id);
+
+    private static RouterOSWireGuardPeer Peer(
+        IReadOnlyList<string> allowedAddresses,
+        string publicKey,
+        string interfaceName = "wg-remote",
+        string id = "*1") => new(
+            id,
             interfaceName,
             "Existing",
             RouterOSPeerCreation.WireRouteManagedComment,
             publicKey,
-            [allowedAddress],
+            allowedAddresses,
             null,
             null,
             null,

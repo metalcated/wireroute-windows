@@ -534,6 +534,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="RouterOSSummaryText" VerticalAlignment="Center" FontWeight="SemiBold" Text="Not connected" />
                         <CheckBox
@@ -545,8 +546,14 @@
                             ToolTipService.ToolTip="Include site-to-site and manually created peers. WireRoute clients are identified by their RouterOS comment."
                             Unchecked="RouterOSShowAllPeersCheckBox_Changed" />
                         <Button
-                            x:Name="RouterOSSetUpPeerButton"
+                            x:Name="RouterOSRecoverProfileButton"
                             Grid.Column="2"
+                            Click="RouterOSRecoverProfileButton_Click"
+                            IsEnabled="False"
+                            Content="Recover Profile…" />
+                        <Button
+                            x:Name="RouterOSSetUpPeerButton"
+                            Grid.Column="3"
                             Click="RouterOSSetUpPeerButton_Click"
                             IsEnabled="False"
                             Content="Set Up Peer…" />
@@ -584,7 +591,8 @@
                                 BorderThickness="0"
                                 IsItemClickEnabled="False"
                                 ItemsSource="{x:Bind RouterOSDiscoveryRows}"
-                                SelectionMode="None">
+                                SelectionChanged="RouterOSDiscoveryList_SelectionChanged"
+                                SelectionMode="Single">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Padding="10,8" ColumnSpacing="14">
