@@ -1,0 +1,180 @@
+name: Build and release WireRoute
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version in x.y.z format
+        required: true
+        default: 0.1.0
+        type: string
+      publish_prerelease:
+        description: Publish the unsigned artifacts as a GitHub pre-release
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: wireroute-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  verify:
+    name: Test and compile
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run managed tests
+        shell: pwsh
+        run: |
+          dotnet test tests\WireRoute.Core.Tests\WireRoute.Core.Tests.csproj --configuration Release
+          dotnet test tests\WireRoute.RouterOS.Tests\WireRoute.RouterOS.Tests.csproj --configuration Release
+          dotnet test tests\WireRoute.Storage.Tests\WireRoute.Storage.Tests.csproj --configuration Release -p:Platform=x64
+
+      - name: Run native tests
+        shell: pwsh
+        run: go test ./tunnel ./manager ./driver
+
+      - name: Compile the x64 WinUI application
+        shell: pwsh
+        run: dotnet build src\WireRoute.App\WireRoute.App.csproj --configuration Release --runtime win-x64 -p:Platform=x64
+
+  package:
+    name: Package x64 and ARM64
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Validate the requested version
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+              throw 'The release version must use x.y.z format.'
+          }
+          if ('${{ inputs.publish_prerelease }}' -eq 'true' -and $env:SOURCE_REF -ne 'refs/heads/main') {
+              throw 'GitHub pre-releases can be published only from the main branch.'
+          }
+
+      - name: Prepare native resources and backends
+        shell: pwsh
+        run: |
+          & .\build.bat
+          if ($LASTEXITCODE -ne 0) {
+              throw "build.bat failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Build release artifacts
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: .\scripts\Build-WireRouteRelease.ps1 -Version $env:RELEASE_VERSION -SkipNativeBuild
+
+      - name: Validate release artifacts
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: .\scripts\Test-WireRouteRelease.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Upload unsigned build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: WireRoute-${{ inputs.version }}-unsigned
+          path: |
+            installer/dist/WireRoute-x64-${{ inputs.version }}.msi
+            installer/dist/WireRoute-ARM64-${{ inputs.version }}.msi
+            installer/dist/WireRoute-x64-${{ inputs.version }}.zip
+            installer/dist/WireRoute-ARM64-${{ inputs.version }}.zip
+            installer/dist/WireRoute-${{ inputs.version }}-SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish_unsigned_prerelease:
+    name: Publish unsigned pre-release
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_prerelease == true && github.ref == 'refs/heads/main'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download validated artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: WireRoute-${{ inputs.version }}-unsigned
+          path: artifacts
+
+      - name: Publish GitHub pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: |
+            > [!WARNING]
+            > These preview installers and portable archives are unsigned. Windows cannot yet verify WireRoute as the publisher. Verify downloads against the attached SHA-256 manifest. Signed stable releases will begin only after the SignPath Foundation release pipeline is approved and active.
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::error::Release ${tag} already exists; versioned releases are immutable."
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+            echo "::error::Tag ${tag} already exists; versioned releases are immutable."
+            exit 1
+          fi
+          gh release create "${tag}" artifacts/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "WireRoute ${RELEASE_VERSION} (unsigned preview)" \
+            --notes "${RELEASE_NOTES}" \
+            --generate-notes \
+            --prerelease \
+            --latest=false

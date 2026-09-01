@@ -97,6 +97,20 @@ WireRoute-1.0.0-SHA256SUMS.txt
 
 `Build-WireRouteInstaller.ps1` can build one MSI from an already staged application directory. `Publish-WireRouteApp.ps1` and `Build-WireRouteInstaller.ps1` are lower-level helpers; the release script is the canonical full build.
 
+Validate that all expected files exist, the MSI and ZIP containers are readable, and every payload matches the checksum manifest:
+
+```powershell
+.\scripts\Test-WireRouteRelease.ps1 -Version 1.0.0
+```
+
+## GitHub Actions release workflow
+
+`.github/workflows/release.yml` runs the managed tests, focused native tests, and an x64 WinUI compile on pushes and pull requests targeting `main`. A manual workflow run additionally prepares the native toolchain, packages x64 and ARM64, validates the release set, and retains the unsigned files as a GitHub Actions artifact for 14 days.
+
+The manual run accepts a numeric `x.y.z` version and a separate **Publish the unsigned artifacts as a GitHub pre-release** choice. Leave publishing disabled for a build-only validation run. Enabling it creates an immutable version tag and an explicitly labeled unsigned pre-release from the same validated files. It cannot replace an existing version.
+
+Until the SignPath Foundation application is accepted and the signing workflow is active, this pipeline intentionally cannot publish a stable or signed release. The production signing stage will be added between validation and release publication and will retain the existing manual-approval boundary.
+
 ## Signing
 
 For a certificate available to SignTool through the Windows certificate store, pass its SHA-1 thumbprint:

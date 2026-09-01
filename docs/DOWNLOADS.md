@@ -16,6 +16,8 @@ The MSI is the recommended installation format. Portable ZIPs are provided for d
 
 WireRoute is applying for the SignPath Foundation open-source code-signing program. Until the application is accepted and the verified release pipeline is active, release artifacts remain unsigned. A release is represented as signed only when Windows reports a valid Authenticode signature issued in the name of SignPath Foundation.
 
+During this interim period, the reviewed GitHub Actions workflow can publish only an explicitly labeled **unsigned pre-release**. Stable signed releases remain disabled until the SignPath signing and approval stage is active.
+
 Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
 
 See the complete [WireRoute code-signing policy](CODE_SIGNING_POLICY.md).

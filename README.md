@@ -19,6 +19,8 @@ Native releases are produced independently for x64 and ARM64. x86 emulation is n
 
 WireRoute is applying for sponsored open-source code signing through SignPath Foundation. Until the application is accepted and the verified release pipeline is active, published Windows artifacts remain unsigned and should be checked against the SHA-256 manifest included with each release.
 
+The repository's GitHub Actions workflow continuously validates `main` and can build both release architectures on demand. Before SignPath activation, its publishing path is deliberately limited to clearly marked unsigned pre-releases.
+
 Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
 
 ## Current capabilities
