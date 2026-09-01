@@ -109,6 +109,8 @@ Validate that all expected files exist, the MSI and ZIP containers are readable,
 
 The manual run accepts a numeric `x.y.z` version and a separate **Publish the unsigned artifacts as a GitHub pre-release** choice. Leave publishing disabled for a build-only validation run. Enabling it creates an immutable version tag and an explicitly labeled unsigned pre-release from the same validated files. It cannot replace an existing version.
 
+The canonical release path is an annotated `vX.Y.Z` tag on a commit reachable from `main`. Pushing that tag runs the same verification and packaging jobs, derives the product version from the tag, and publishes the validated files as the unsigned pre-release. The workflow rejects malformed tags, tags outside `main` history, and an existing GitHub Release for the version.
+
 Until the SignPath Foundation application is accepted and the signing workflow is active, this pipeline intentionally cannot publish a stable or signed release. The production signing stage will be added between validation and release publication and will retain the existing manual-approval boundary.
 
 ## Signing
