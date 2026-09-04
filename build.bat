@@ -20,7 +20,7 @@ if exist .deps\prepared goto :render
 	call :download imagemagick.zip https://download.wireguard.com/windows-toolchain/distfiles/ImageMagick-7.0.8-42-portable-Q16-x64.zip 584e069f56456ce7dde40220948ff9568ac810688c892c5dfb7f6db902aa05aa "convert.exe colors.xml delegates.xml" || goto :error
 	rem Mirror of https://sourceforge.net/projects/ezwinports/files/make-4.2.1-without-guile-w32-bin.zip
 	call :download make.zip https://download.wireguard.com/windows-toolchain/distfiles/make-4.2.1-without-guile-w32-bin.zip 30641be9602712be76212b99df7209f4f8f518ba764cf564262bc9d6e4047cc7 "--strip-components 1 bin" || goto :error
-	call :download wireguard-tools.tar.xz https://git.zx2c4.com/wireguard-tools/snapshot/wireguard-tools-06a99cce2c9998f53eb30d2f258a9e5ff286445b.tar.xz 17686284403c98edb62a83dcf39b0aa688748573b2bc8378c364ef8ef1807c4d "--exclude wg-quick --strip-components 1" || goto :error
+	call :download wireguard-tools.zip https://github.com/WireGuard/wireguard-tools/archive/06a99cce2c9998f53eb30d2f258a9e5ff286445b.zip 209db11b588eb4dc55a05ee70ceea44690ddad44e945d8299e95465a5dec4d7d "--exclude wg-quick --strip-components 1" || goto :error
 	call :download wireguard-nt.zip https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip dceb30a9bc4be48cce0f74160fc88a585a2c2627366e8f846fc6658f9038dace || goto :error
 	copy /y NUL prepared > NUL || goto :error
 	cd .. || goto :error
