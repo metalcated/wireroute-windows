@@ -11,13 +11,25 @@ public sealed partial class MainWindow
     private ModalRequest? activeModal;
     private Action<WireRouteModalResult>? dismissActiveModal;
 
-    private async Task<WireRouteModalResult> ShowModalAsync(ModalRequest request)
+    private async Task<WireRouteModalResult> ShowModalAsync(ModalRequest request, ModalRequest? parent = null)
     {
-        if (activeModal is not null)
+        // Child navigation is explicit. Keep the parent's actual controls (including
+        // unsaved editor text), buttons, scroll position, and dismissal handler alive.
+        if (activeModal != parent)
         {
             throw new InvalidOperationException("A WireRoute modal is already open.");
         }
 
+        var parentHeader = ModalHeaderPresenter.Content;
+        var parentFooter = ModalFooterPresenter.Content;
+        var parentFooterVisibility = ModalFooterPresenter.Visibility;
+        var parentDismiss = dismissActiveModal;
+        var parentOffset = ModalContentScrollViewer.VerticalOffset;
+        var parentFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
+        var parentWidth = ModalFrame.Width;
+        ModalHeaderPresenter.Content = null;
+        ModalContentPresenter.Content = null;
+        ModalFooterPresenter.Content = null;
         activeModal = request;
         var completion = new TaskCompletionSource<WireRouteModalResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -141,6 +153,7 @@ public sealed partial class MainWindow
             : Visibility.Visible;
         void UpdateModalSize()
         {
+            if (activeModal != request) return;
             var availableWidth = Root.ActualWidth > 0 ? Root.ActualWidth : 1180;
             var availableHeight = Root.ActualHeight > 0 ? Root.ActualHeight : 760;
             ModalFrame.Width = Math.Min(request.MaxWidth, Math.Max(200, availableWidth - 48));
@@ -154,21 +167,36 @@ public sealed partial class MainWindow
 
         void Finish(WireRouteModalResult result)
         {
-            if (isFinished)
+            if (isFinished || activeModal != request)
             {
                 return;
             }
 
             isFinished = true;
-            ModalOverlay.Visibility = Visibility.Collapsed;
+            ModalOverlay.Visibility = parent is null ? Visibility.Collapsed : Visibility.Visible;
             ModalHeaderPresenter.Content = null;
             ModalContentPresenter.Content = null;
             ModalFooterPresenter.Content = null;
             ModalFooterPresenter.Visibility = Visibility.Visible;
             Root.SizeChanged -= resizeHandler;
             request.DetachButtons();
-            activeModal = null;
-            dismissActiveModal = null;
+            activeModal = parent;
+            dismissActiveModal = parentDismiss;
+            if (parent is not null)
+            {
+                ModalHeaderPresenter.Content = parentHeader;
+                ModalContentPresenter.Content = parent.Content;
+                ModalFooterPresenter.Content = parentFooter;
+                ModalFooterPresenter.Visibility = parentFooterVisibility;
+                ModalFrame.Width = Math.Min(parent.MaxWidth,
+                    Root.ActualWidth > 0 ? Math.Max(200, Root.ActualWidth - 48) : parentWidth);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (activeModal != parent) return;
+                    ModalContentScrollViewer.ChangeView(null, parentOffset, null, disableAnimation: true);
+                    parentFocus?.Focus(FocusState.Programmatic);
+                });
+            }
             completion.TrySetResult(result);
         }
 
@@ -176,7 +204,7 @@ public sealed partial class MainWindow
             WireRouteModalResult result,
             Func<Task<bool>>? action)
         {
-            if (request.IsBusy)
+            if (request.IsBusy || activeModal != request)
             {
                 return;
             }
@@ -236,6 +264,8 @@ public sealed partial class MainWindow
         dismissActiveModal = Finish;
         DispatcherQueue.TryEnqueue(() =>
         {
+            if (activeModal != request) return;
+            ModalContentScrollViewer.ChangeView(null, 0, null, disableAnimation: true);
             (primaryButton ?? cancelButton ?? secondaryButton)?.Focus(FocusState.Programmatic);
         });
         return await completion.Task;

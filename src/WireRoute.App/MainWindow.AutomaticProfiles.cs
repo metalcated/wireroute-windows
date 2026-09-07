@@ -48,6 +48,10 @@ public sealed partial class MainWindow
             : appSettings.SingleProfileOnDemandSuspended
                 ? "Off. Saved single-profile On-Demand rules remain paused."
                 : "Off. Choose profiles for Wi-Fi, cellular, and Ethernet networks.";
+        ProfilesAutomaticSummaryText.Text = appSettings.AutomaticProfiles.Enabled
+            ? "On · choose a profile for each network"
+            : "Off · switch profiles by network";
+        UpdateProfileOnDemandSummary(selectedProfile);
     }
 
     private HashSet<Guid> ActiveLocalProfileIds() => Profiles

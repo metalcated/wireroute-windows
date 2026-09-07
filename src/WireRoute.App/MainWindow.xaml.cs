@@ -407,18 +407,7 @@ public sealed partial class MainWindow : Window
             peer.PersistentKeepalive is null or 0
                 ? "Off"
                 : "every " + peer.PersistentKeepalive.Value + " seconds"));
-        ProfileOnDemandText.Text = item.StoredProfile is null
-            ? "Off"
-            : item.StoredProfile.OnDemandEthernet || item.StoredProfile.OnDemandWiFi
-                ? string.Join(", ", new[]
-                {
-                    item.StoredProfile.OnDemandEthernet ? "Ethernet" : null,
-                    item.StoredProfile.OnDemandWiFi ? "Wi-Fi" : null,
-                }.Where(value => value is not null))
-                : "Off";
-        if (item.StoredProfile is not null && (item.StoredProfile.OnDemandEthernet || item.StoredProfile.OnDemandWiFi)
-            && (appSettings.AutomaticProfiles.Enabled || appSettings.SingleProfileOnDemandSuspended))
-            ProfileOnDemandText.Text += " (paused; see Automatic profiles)";
+        UpdateProfileOnDemandSummary(item);
         UpdateProfilePolicyControls(item, profile);
         HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -484,7 +473,7 @@ public sealed partial class MainWindow : Window
             peer.PersistentKeepalive is null or 0
                 ? "Off"
                 : "every " + peer.PersistentKeepalive.Value + " seconds"));
-        ProfileOnDemandText.Text = "Off";
+        UpdateProfileOnDemandSummary(item);
         SetRouteSegmentState(profile.DetectedRouteMode == TunnelRouteMode.Full);
         ProfileRoutingHelpText.Text = profile.DetectedRouteMode == TunnelRouteMode.Full
             ? "Full tunnel sends all supported traffic through the VPN."

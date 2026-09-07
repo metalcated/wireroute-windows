@@ -15,7 +15,7 @@ public sealed partial class MainWindow
         await ShowAutomaticProfilesAsync();
     }
 
-    private async Task ShowAutomaticProfilesAsync()
+    private async Task ShowAutomaticProfilesAsync(ModalRequest? parent = null)
     {
         var saved = appSettings.AutomaticProfiles;
         var defaultId = saved.DefaultProfileId;
@@ -302,7 +302,8 @@ public sealed partial class MainWindow
             },
         };
         ShowForm();
-        if (await ShowModalAsync(request) == WireRouteModalResult.Primary) await EvaluateOnDemandAsync();
+        if (await ShowModalAsync(request, parent) == WireRouteModalResult.Primary && parent is null)
+            await EvaluateOnDemandAsync();
     }
 
     private static string[] TrustedLines(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal)

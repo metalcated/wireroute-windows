@@ -13,5 +13,6 @@
     <ProjectReference Include="..\..\src\WireRoute.Storage\WireRoute.Storage.csproj" />
     <Compile Include="..\..\src\WireRoute.App\Interop\PhysicalNetworkInterface.cs" Link="Interop\PhysicalNetworkInterface.cs" />
     <Compile Include="..\..\src\WireRoute.App\Interop\ProfileNetworkMonitor.cs" Link="Interop\ProfileNetworkMonitor.cs" />
+    <Compile Include="..\..\src\WireRoute.App\Models\ProfileOnDemandDraft.cs" Link="Models\ProfileOnDemandDraft.cs" />
   </ItemGroup>
 </Project>

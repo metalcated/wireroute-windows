@@ -1,6 +1,18 @@
 # Automatic profiles
 
-Open **Settings → Automatic profiles → Configure automatic profiles**. This Windows feature follows the behavior in WireRoute Android's `feature/network-profile-switching` implementation, using native Windows controls and the existing Blue Nordic/System light/System dark palettes. No Android code or dependencies are embedded in the Windows app.
+Open **Profiles → Automatic profiles** in the sidebar. This Windows feature follows the behavior in WireRoute Android's `feature/network-profile-switching` implementation, using native Windows controls and the existing Blue Nordic/System light/System dark palettes. No Android code or dependencies are embedded in the Windows app.
+
+## On-Demand entry points
+
+Automatic profiles is an enhancement of On-Demand, not a separate Settings-only feature:
+
+- The **Automatic profiles** button above the sidebar profile list is always available and shows whether the feature is on or off.
+- Each locally saved profile has an **On-Demand** action below DNS Protection. While automatic mode is enabled, it shows **Automatic profile switching** and opens that configuration directly.
+- With automatic mode off, the action opens the profile's single-profile Ethernet/Wi-Fi rules. Choose **Switch profiles by network…** to open Automatic profiles.
+- **Edit configuration → On-Demand → Configure…** uses the same flow instead of the old inline checkboxes. Returning from a child screen restores the existing editor, including its unsaved name, configuration, and rule draft. Saving single-profile rules here updates only the editor draft until the configuration is saved; Cancel/Discard on the configuration discards those edits.
+- **Settings → Automatic profiles → Configure automatic profiles** remains a secondary entry point.
+
+Automatic profiles is global: **Save** in that screen saves its settings independently, even when opened from a profile editor. Canceling the surrounding profile editor does not undo an explicit automatic-settings save. Rule evaluation waits until all open dialogs close. An unsaved new profile must be saved before it appears in automatic profile pickers.
 
 ## Set up rules
 
@@ -43,9 +55,9 @@ Switching briefly disconnects the VPN and **is not a kill switch**. Full-tunnel 
 
 ## Existing On-Demand and Persistent VPN
 
-Enabling automatic profiles pauses the saved Ethernet/Wi-Fi single-profile On-Demand rules without deleting them. While automatic mode is enabled, the profile editor shows those rules as paused and disables their checkboxes.
+Enabling automatic profiles pauses the saved Ethernet/Wi-Fi single-profile On-Demand rules without deleting them. The profile detail and editor On-Demand buttons then display **Automatic profile switching** and open the automatic settings directly. If automatic mode is enabled from an already-open single-profile dialog, its saved checkboxes are disabled and labeled as paused when you return.
 
-Disabling automatic mode does **not** silently reactivate the old rules. Select **Resume saved single-profile On-Demand rules when automatic profiles are off** and save, or explicitly enable a previously unchecked On-Demand option in the profile editor. A normal profile edit does not resume unchanged paused rules.
+Disabling automatic mode does **not** silently reactivate the old rules. Select **Resume saved single-profile On-Demand rules when automatic profiles are off** in Automatic profiles, or **Resume saved single-profile On-Demand rules** in a profile's On-Demand screen, and save. Resuming applies to all saved single-profile rules. A normal profile edit or changing a network checkbox alone does not resume paused rules. A later automatic-settings save clears an earlier, unsaved request to resume, so an old editor draft cannot override the newer mode choice.
 
 This feature retains the existing Windows administrator-approval model for every tunnel start and stop. A switch may require approval to stop one tunnel and again to start its replacement. There is no new always-running manager service, new privilege bypass, driver change, RouterOS write, or packaging-capability change. Truly unattended switching requires a separately designed and approved privileged control channel.
 
@@ -62,6 +74,9 @@ Automated checks cover transport actions, trusted/assigned/default priority, exa
 Before release, test on native x64 and ARM64 Windows with safe test profiles:
 
 - Blue Nordic and System light/dark: labels, radio choices, assignment dropdown, text entry, scrolling, keyboard navigation, Cancel/Save, and live theme updates.
+- Sidebar access with and without saved profiles; direct profile On-Demand access; Settings access; automatic-mode labels updating immediately without navigating away.
+- Edit a name/configuration without saving, open On-Demand and then Automatic profiles, cancel a picker, save/cancel the child screens, and verify the editor draft, scroll position, and working buttons return. Escape closes only the current dialog (or the whole Automatic profiles draft from its picker) and restores its parent. Resize while inside a child screen and check the restored parent layout.
+- Cancel the outer configuration editor after saving Automatic profiles: the configuration must remain unchanged while the explicitly saved global settings remain. Confirm a new unsaved profile is absent from the global pickers. Verify that unrelated dialogs still reject accidental overlapping opens.
 - Ethernet/Wi-Fi/cellular handovers, simultaneous physical adapters, sleep/resume, and changes while an elevation prompt is open.
 - Trusted Wi-Fi, exact-name assignments, unavailable SSID access, deleted/renamed profiles, and no network.
 - Manual activation and disconnection from both the app and tray; a manual VPN must survive every automatic rule, including trusted Wi-Fi.

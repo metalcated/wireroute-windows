@@ -88,16 +88,9 @@ public sealed partial class MainWindow
             Text = item?.Name ?? string.Empty,
             PlaceholderText = "Profile name",
         };
-        var ethernetBox = new CheckBox
-        {
-            Content = "Ethernet",
-            IsChecked = item?.StoredProfile?.OnDemandEthernet == true,
-        };
-        var wifiBox = new CheckBox
-        {
-            Content = "Wi-Fi",
-            IsChecked = item?.StoredProfile?.OnDemandWiFi == true,
-        };
+        var initialOnDemand = new ProfileOnDemandDraft(
+            item?.StoredProfile?.OnDemandEthernet == true, item?.StoredProfile?.OnDemandWiFi == true);
+        var onDemandDraft = initialOnDemand;
         var configurationBox = CreateWireGuardConfigurationEditor(initialConfiguration);
         var publicKeyText = new TextBlock
         {
@@ -227,15 +220,11 @@ public sealed partial class MainWindow
         }
         AddFormRow(identityGrid, 0, "Name:", nameBox);
         AddFormRow(identityGrid, 1, "Public key:", publicKeyText);
-        var onDemand = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-        onDemand.Children.Add(ethernetBox);
-        onDemand.Children.Add(wifiBox);
-        ethernetBox.IsEnabled = wifiBox.IsEnabled = !appSettings.AutomaticProfiles.Enabled;
-        var onDemandContent = new StackPanel { Spacing = 6 };
-        onDemandContent.Children.Add(onDemand);
-        if (appSettings.AutomaticProfiles.Enabled || appSettings.SingleProfileOnDemandSuspended)
-            onDemandContent.Children.Add(SecondaryText("Saved rules paused. Manage them in Settings → Automatic profiles."));
-        AddFormRow(identityGrid, 2, "On-Demand:", onDemandContent);
+        var onDemandButton = new Button { HorizontalAlignment = HorizontalAlignment.Left };
+        void RefreshOnDemandButton() => onDemandButton.Content = onDemandDraft.Summary(
+            appSettings.AutomaticProfiles.Enabled, appSettings.SingleProfileOnDemandSuspended) + " — Configure…";
+        RefreshOnDemandButton();
+        AddFormRow(identityGrid, 2, "On-Demand:", onDemandButton);
 
         var editorStack = new StackPanel { Spacing = 10 };
         editorStack.Children.Add(new TextBlock
@@ -293,23 +282,15 @@ public sealed partial class MainWindow
                         existing?.DnsProvider,
                         existing?.DnsResolverUrl,
                         existing?.DnsBootstrapAddresses ?? Array.Empty<string>(),
-                        ethernetBox.IsChecked == true,
-                        wifiBox.IsChecked == true,
+                        onDemandDraft.Ethernet,
+                        onDemandDraft.WiFi,
                         existing?.CreatedAt ?? now,
                         now)
                     {
                         ServiceName = tunnelName,
                     };
                     await profileStore.SaveAsync(stored, managerCancellation.Token);
-                    if (!appSettings.AutomaticProfiles.Enabled && appSettings.SingleProfileOnDemandSuspended
-                        && ((stored.OnDemandWiFi && existing?.OnDemandWiFi != true)
-                            || (stored.OnDemandEthernet && existing?.OnDemandEthernet != true)))
-                    {
-                        var resumed = appSettings with { SingleProfileOnDemandSuspended = false };
-                        await settingsStore.SaveAsync(resumed, managerCancellation.Token);
-                        appSettings = resumed;
-                        UpdateAutomaticProfilesStatus();
-                    }
+                    await ResumeLegacyOnDemandAsync(onDemandDraft.ResumeSavedRules);
                     if (item is null)
                     {
                         var created = new ProfileNavigationItem(stored, parsed);
@@ -341,6 +322,21 @@ public sealed partial class MainWindow
                 }
             },
         };
+        onDemandButton.Click += async (_, _) =>
+        {
+            if (activeModal != request || request.IsBusy) return;
+            try
+            {
+                var previousPolicy = appSettings.AutomaticProfiles;
+                var updated = await ShowProfileOnDemandAsync(
+                    string.IsNullOrWhiteSpace(nameBox.Text) ? "this profile" : nameBox.Text.Trim(), onDemandDraft, request);
+                if (updated is not null) onDemandDraft = updated;
+                else if (!ReferenceEquals(previousPolicy, appSettings.AutomaticProfiles))
+                    onDemandDraft = onDemandDraft with { ResumeSavedRules = false };
+                RefreshOnDemandButton();
+            }
+            catch (Exception exception) { KeepModalOpen(request, errorText, exception.Message); }
+        };
         var modal = ShowModalAsync(request);
         DispatcherQueue.TryEnqueue(() =>
         {
@@ -348,11 +344,10 @@ public sealed partial class MainWindow
             nameBox.Focus(FocusState.Programmatic);
             nameBox.SelectAll();
         });
-        var result = await modal;
-        if (result == WireRouteModalResult.Primary)
-        {
-            await EvaluateOnDemandAsync();
-        }
+        await modal;
+        // Automatic profile rules may have been saved in a child screen even if
+        // the configuration draft was canceled. Never evaluate with an editor open.
+        await EvaluateOnDemandAsync();
     }
 
     private async void ProfileSplitButton_Click(object sender, RoutedEventArgs e)

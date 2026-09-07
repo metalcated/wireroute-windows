@@ -42,6 +42,21 @@
                     FontSize="12"
                     Text="Choose a profile to connect or change its routing."
                     TextWrapping="Wrap" />
+                <Button Margin="0,12,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                        Padding="12,10" Click="AutomaticProfilesButton_Click" AutomationProperties.Name="Automatic profiles">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="3">
+                            <TextBlock FontWeight="SemiBold" Text="Automatic profiles" />
+                            <TextBlock x:Name="ProfilesAutomaticSummaryText" FontSize="11" Foreground="{StaticResource NordicSecondaryTextBrush}"
+                                       Text="Off · switch profiles by network" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <FontIcon Grid.Column="1" VerticalAlignment="Center" FontSize="12" Glyph="&#xE76C;" />
+                    </Grid>
+                </Button>
             </StackPanel>
 
             <TextBlock
@@ -339,6 +354,23 @@
                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                         <FontIcon FontFamily="Segoe Fluent Icons" FontSize="14" Glyph="&#xEA18;" />
                                         <TextBlock x:Name="ProfileDnsModeText" Text="Profile DNS" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Grid ColumnSpacing="18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="3">
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="On-Demand" />
+                                    <TextBlock Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12"
+                                               Text="Connect automatically or switch profiles as your network changes." TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="ProfileOnDemandButton" Grid.Column="1" Click="ProfileOnDemandButton_Click" AutomationProperties.Name="Configure On-Demand">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock x:Name="ProfileOnDemandActionText" Text="Configure…" />
+                                        <FontIcon FontSize="12" Glyph="&#xE76C;" />
                                     </StackPanel>
                                 </Button>
                             </Grid>
