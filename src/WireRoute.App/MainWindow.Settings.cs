@@ -68,8 +68,12 @@ public sealed partial class MainWindow
         try
         {
             appSettings = await settingsStore.LoadAsync(managerCancellation.Token);
+            appSettings.AutomaticProfiles.Validate();
+            automaticSettingsLoaded = true;
             PopulateSettingsFields(appSettings);
             ApplyAppearanceSettings(appSettings);
+            UpdateAutomaticProfilesStatus();
+            await EvaluateOnDemandAsync();
             await RecordActivityAsync(
                 WireRouteActivityKind.AppStarted,
                 null,
@@ -126,7 +130,11 @@ public sealed partial class MainWindow
                 string.Join(", ", splitRoutes),
                 keepalive,
                 SettingsPersistentServiceToggle.IsOn,
-                appSettings.ActivityRetentionDays);
+                appSettings.ActivityRetentionDays)
+            {
+                AutomaticProfiles = appSettings.AutomaticProfiles,
+                SingleProfileOnDemandSuspended = appSettings.SingleProfileOnDemandSuspended,
+            };
             var persistenceChanged = settings.PersistentTunnelService
                 != appSettings.PersistentTunnelService;
             if (persistenceChanged
@@ -139,6 +147,10 @@ public sealed partial class MainWindow
             }
 
             var previousSettings = appSettings;
+            // Saving settings must not race an in-flight automatic handover.
+            if (onDemandGate.CurrentCount == 0 || Profiles.Any(profile => profile.IsTransitioning))
+                throw new InvalidOperationException("Wait for the current tunnel operation to finish before saving settings.");
+            if (persistenceChanged) PauseAutomaticProfilesForManualControl();
             await settingsStore.SaveAsync(settings, managerCancellation.Token);
             try
             {

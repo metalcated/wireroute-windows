@@ -19,6 +19,7 @@ public sealed partial class MainWindow
         }
         NetworkInformation.NetworkStatusChanged += NetworkStatusChanged;
         isMonitoringNetworks = true;
+        StartAutomaticProfilePolling();
     }
 
     private void StopOnDemandMonitoring()
@@ -29,6 +30,7 @@ public sealed partial class MainWindow
         }
         NetworkInformation.NetworkStatusChanged -= NetworkStatusChanged;
         isMonitoringNetworks = false;
+        automaticTimer?.Stop();
     }
 
     private void NetworkStatusChanged(object sender)
@@ -38,7 +40,15 @@ public sealed partial class MainWindow
 
     private async Task EvaluateOnDemandAsync()
     {
+        if (!automaticSettingsLoaded || !automaticProfilesLoaded || isExiting) return;
+        if (appSettings.AutomaticProfiles.Enabled)
+        {
+            await EvaluateAutomaticProfilesAsync();
+            return;
+        }
+        if (appSettings.SingleProfileOnDemandSuspended) return;
         if (DateTimeOffset.UtcNow < nextOnDemandAttempt
+            || activeModal is not null
             || Profiles.Any(profile => profile.IsTransitioning)
             || !await onDemandGate.WaitAsync(0))
         {
@@ -75,7 +85,7 @@ public sealed partial class MainWindow
                     WireRouteActivityKind.OnDemandUnmatched,
                     activeOnDemandProfile,
                     "On-Demand no longer matches the current Windows network.");
-                await ToggleLocalProfileAsync(activeOnDemandProfile);
+                await ChangeLocalProfileStateAsync(activeOnDemandProfile);
                 return;
             }
 
@@ -99,7 +109,7 @@ public sealed partial class MainWindow
                 WireRouteActivityKind.OnDemandMatched,
                 candidate,
                 "On-Demand matched the current Windows network.");
-            await ToggleLocalProfileAsync(candidate);
+            await ChangeLocalProfileStateAsync(candidate);
         }
         catch (Exception exception)
         {

@@ -170,6 +170,7 @@ public sealed partial class MainWindow : Window
                     // Leave malformed protected entries untouched for a future recovery flow.
                 }
             }
+            automaticProfilesLoaded = true;
             await EvaluateOnDemandAsync();
 
             if (ProfilesList.SelectedItem is null && Profiles.Count > 0)
@@ -415,6 +416,9 @@ public sealed partial class MainWindow : Window
                     item.StoredProfile.OnDemandWiFi ? "Wi-Fi" : null,
                 }.Where(value => value is not null))
                 : "Off";
+        if (item.StoredProfile is not null && (item.StoredProfile.OnDemandEthernet || item.StoredProfile.OnDemandWiFi)
+            && (appSettings.AutomaticProfiles.Enabled || appSettings.SingleProfileOnDemandSuspended))
+            ProfileOnDemandText.Text += " (paused; see Automatic profiles)";
         UpdateProfilePolicyControls(item, profile);
         HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
     }

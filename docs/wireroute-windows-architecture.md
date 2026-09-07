@@ -41,6 +41,7 @@ There is no always-running global manager in the default topology.
 6. Profiles, RouterOS credentials, certificate pins, uncertain-write recovery records, settings, activity events, and connection sessions use current-user Windows DPAPI beneath `%LOCALAPPDATA%\WireRoute`.
 7. Blue Nordic is the default appearance. System follows Windows light/dark state. Tray icon styles mirror the macOS choices using Windows notification-area assets.
 8. Closing the window hides it to the notification area. Quit is explicit.
+9. [Automatic profiles](AUTOMATIC_PROFILES.md) is opt-in, user-session policy. Rules reference stable profile IDs in protected settings; ephemeral ownership, manual pauses, and handover revisions live only in memory. It uses the existing per-operation elevated controller and adds no privileged service or new backend command.
 
 ## Profile and tunnel boundary
 

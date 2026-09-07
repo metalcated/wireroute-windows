@@ -230,7 +230,12 @@ public sealed partial class MainWindow
         var onDemand = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
         onDemand.Children.Add(ethernetBox);
         onDemand.Children.Add(wifiBox);
-        AddFormRow(identityGrid, 2, "On-Demand:", onDemand);
+        ethernetBox.IsEnabled = wifiBox.IsEnabled = !appSettings.AutomaticProfiles.Enabled;
+        var onDemandContent = new StackPanel { Spacing = 6 };
+        onDemandContent.Children.Add(onDemand);
+        if (appSettings.AutomaticProfiles.Enabled || appSettings.SingleProfileOnDemandSuspended)
+            onDemandContent.Children.Add(SecondaryText("Saved rules paused. Manage them in Settings → Automatic profiles."));
+        AddFormRow(identityGrid, 2, "On-Demand:", onDemandContent);
 
         var editorStack = new StackPanel { Spacing = 10 };
         editorStack.Children.Add(new TextBlock
@@ -296,6 +301,15 @@ public sealed partial class MainWindow
                         ServiceName = tunnelName,
                     };
                     await profileStore.SaveAsync(stored, managerCancellation.Token);
+                    if (!appSettings.AutomaticProfiles.Enabled && appSettings.SingleProfileOnDemandSuspended
+                        && ((stored.OnDemandWiFi && existing?.OnDemandWiFi != true)
+                            || (stored.OnDemandEthernet && existing?.OnDemandEthernet != true)))
+                    {
+                        var resumed = appSettings with { SingleProfileOnDemandSuspended = false };
+                        await settingsStore.SaveAsync(resumed, managerCancellation.Token);
+                        appSettings = resumed;
+                        UpdateAutomaticProfilesStatus();
+                    }
                     if (item is null)
                     {
                         var created = new ProfileNavigationItem(stored, parsed);

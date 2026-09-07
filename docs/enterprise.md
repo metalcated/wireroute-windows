@@ -65,6 +65,10 @@ Persistent VPN requires Profile DNS. WireRoute's encrypted DNS mode depends on a
 
 Ethernet and Wi-Fi On-Demand selections are evaluated by the signed-in WireRoute application. They are convenient user-session automation, not a pre-logon machine policy and not a replacement for Persistent VPN.
 
+Settings also offers [Automatic profiles](AUTOMATIC_PROFILES.md), following WireRoute Android's network-profile switching model. Enabling it pauses the saved single-profile rules. Disabling it does not silently resume them or disconnect the current tunnel. Only connections started by automatic switching in the current app session can be switched; existing or manual connections are never adopted.
+
+Automatic profiles retains the same per-operation Windows elevation requirement. It is not an unattended privileged service or a kill switch. Rules run only while the signed-in tray application is running. Unknown active virtual adapters conservatively prevent switching; this can also affect virtual-machine, Hyper-V, or WSL networking. Wi-Fi rules use exact connected names, not Windows network display names, and do not authenticate a trusted network.
+
 ## Administrative boundaries
 
 - Users require the ability to approve elevation, or an administrator must provide an approved elevation workflow, to start and stop tunnels.

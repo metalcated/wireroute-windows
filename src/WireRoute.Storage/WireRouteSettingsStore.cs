@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using WireRoute.Core.Profiles;
 
 namespace WireRoute.Storage;
 
@@ -12,6 +13,9 @@ public sealed record WireRouteAppSettings(
     bool PersistentTunnelService,
     int ActivityRetentionDays = 7)
 {
+    public AutomaticProfilePolicy AutomaticProfiles { get; init; } = new();
+    public bool SingleProfileOnDemandSuspended { get; init; }
+
     public static WireRouteAppSettings Defaults { get; } = new(
         "Blue Nordic",
         "Default",
@@ -53,6 +57,8 @@ public sealed class WireRouteSettingsStore
     private static void Validate(WireRouteAppSettings value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(value.AutomaticProfiles);
+        value.AutomaticProfiles.Validate();
         if (value.Theme is not ("Blue Nordic" or "System"))
         {
             throw new ArgumentException("Choose a supported WireRoute theme.", nameof(value));

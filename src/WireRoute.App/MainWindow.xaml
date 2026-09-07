@@ -737,6 +737,15 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="Automatic profiles" />
+                    <Border Style="{StaticResource NordicCardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Switch profiles by network" FontWeight="SemiBold" />
+                            <TextBlock Text="Choose a default VPN, actions for Wi-Fi, cellular, and Ethernet, and rules for exact Wi-Fi names. Manual connections stay in your control." Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock x:Name="AutomaticProfilesStatusText" Text="Automatic profiles are off." Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="12" TextWrapping="Wrap" />
+                            <Button Content="Configure automatic profiles…" Click="AutomaticProfilesButton_Click" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
                     <TextBlock Margin="0,6,0,-8" Foreground="{StaticResource NordicSecondaryTextBrush}" FontSize="15" FontWeight="SemiBold" Text="Persistent VPN" />
                     <Border Style="{StaticResource NordicCardStyle}" Padding="24">
                         <Grid ColumnSpacing="24">
