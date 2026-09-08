@@ -1,12 +1,11 @@
 # Automatic profiles
 
-Open **Profiles → Automatic profiles** in the sidebar. This Windows feature follows the behavior in WireRoute Android's `feature/network-profile-switching` implementation, using native Windows controls and the existing Blue Nordic/System light/System dark palettes. No Android code or dependencies are embedded in the Windows app.
+Open a saved profile's **On-Demand** action or **Settings → Automatic profiles → Configure automatic profiles**. This Windows feature follows the behavior in WireRoute Android's `feature/network-profile-switching` implementation, using native Windows controls and the existing Blue Nordic/System light/System dark palettes. No Android code or dependencies are embedded in the Windows app.
 
 ## On-Demand entry points
 
 Automatic profiles is an enhancement of On-Demand, not a separate Settings-only feature:
 
-- The **Automatic profiles** button above the sidebar profile list is always available and shows whether the feature is on or off.
 - Each locally saved profile has an **On-Demand** action below DNS Protection. While automatic mode is enabled, the button reads **Automatic profiles** and opens that configuration directly; otherwise it reads **Configure**. The shorter label reduces the button's width without changing its normal height, text size, or padding. The full status remains in Configuration details and the button tooltip.
 - With automatic mode off, the action opens the profile's single-profile Ethernet/Wi-Fi rules. Choose **Switch profiles by network…** to open Automatic profiles.
 - **Edit configuration → On-Demand → Configure…** uses the same flow instead of the old inline checkboxes. Returning from a child screen restores the existing editor, including its unsaved name, configuration, and rule draft. Saving single-profile rules here updates only the editor draft until the configuration is saved; Cancel/Discard on the configuration discards those edits.
@@ -74,7 +73,7 @@ Automated checks cover transport actions, trusted/assigned/default priority, exa
 Before release, test on native x64 and ARM64 Windows with safe test profiles:
 
 - Blue Nordic and System light/dark: labels, radio choices, assignment dropdown, text entry, scrolling, keyboard navigation, Cancel/Save, and live theme updates.
-- Sidebar access with and without saved profiles; direct profile On-Demand access; Settings access; automatic-mode labels updating immediately without navigating away.
+- Sidebar profile-list spacing with and without saved profiles; direct profile On-Demand access; Settings access even with no saved profiles; automatic-mode labels updating immediately without navigating away.
 - Edit a name/configuration without saving, open On-Demand and then Automatic profiles, cancel a picker, save/cancel the child screens, and verify the editor draft, scroll position, and working buttons return. Escape closes only the current dialog (or the whole Automatic profiles draft from its picker) and restores its parent. Resize while inside a child screen and check the restored parent layout.
 - Cancel the outer configuration editor after saving Automatic profiles: the configuration must remain unchanged while the explicitly saved global settings remain. Confirm a new unsaved profile is absent from the global pickers. Verify that unrelated dialogs still reject accidental overlapping opens.
 - Ethernet/Wi-Fi/cellular handovers, simultaneous physical adapters, sleep/resume, and changes while an elevation prompt is open.
