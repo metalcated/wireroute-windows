@@ -82,17 +82,17 @@ Closing the main window leaves WireRoute in the notification area. In default mo
 After native resources have been prepared, create both architectures, MSI installers, portable ZIPs, and the checksum manifest:
 
 ```powershell
-.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.2
+.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.3
 ```
 
 Outputs are written to `installer\dist`:
 
 ```text
-WireRoute-x64-1.1.2.msi
-WireRoute-x64-1.1.2.zip
-WireRoute-ARM64-1.1.2.msi
-WireRoute-ARM64-1.1.2.zip
-WireRoute-1.1.2-SHA256SUMS.txt
+WireRoute-x64-1.1.3.msi
+WireRoute-x64-1.1.3.zip
+WireRoute-ARM64-1.1.3.msi
+WireRoute-ARM64-1.1.3.zip
+WireRoute-1.1.3-SHA256SUMS.txt
 ```
 
 `Build-WireRouteInstaller.ps1` can build one MSI from an already staged application directory. `Publish-WireRouteApp.ps1` and `Build-WireRouteInstaller.ps1` are lower-level helpers; the release script is the canonical full build.
@@ -100,7 +100,7 @@ WireRoute-1.1.2-SHA256SUMS.txt
 Validate that all expected files exist, the MSI and ZIP containers are readable, and every payload matches the checksum manifest:
 
 ```powershell
-.\scripts\Test-WireRouteRelease.ps1 -Version 1.1.2
+.\scripts\Test-WireRouteRelease.ps1 -Version 1.1.3
 ```
 
 ## GitHub Actions release workflow
@@ -119,7 +119,7 @@ For a certificate available to SignTool through the Windows certificate store, p
 
 ```powershell
 .\scripts\Build-WireRouteRelease.ps1 `
-    -Version 1.1.2 `
+    -Version 1.1.3 `
     -SigningCertificateThumbprint YOUR_CERTIFICATE_THUMBPRINT
 ```
 

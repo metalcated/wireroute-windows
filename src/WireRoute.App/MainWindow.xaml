@@ -42,21 +42,6 @@
                     FontSize="12"
                     Text="Choose a profile to connect or change its routing."
                     TextWrapping="Wrap" />
-                <Button Margin="0,12,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                        Padding="12,10" Click="AutomaticProfilesButton_Click" AutomationProperties.Name="Automatic profiles">
-                    <Grid ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="3">
-                            <TextBlock FontWeight="SemiBold" Text="Automatic profiles" />
-                            <TextBlock x:Name="ProfilesAutomaticSummaryText" FontSize="11" Foreground="{StaticResource NordicSecondaryTextBrush}"
-                                       Text="Off · switch profiles by network" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <FontIcon Grid.Column="1" VerticalAlignment="Center" FontSize="12" Glyph="&#xE76C;" />
-                    </Grid>
-                </Button>
             </StackPanel>
 
             <TextBlock

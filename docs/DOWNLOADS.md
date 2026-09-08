@@ -25,7 +25,7 @@ See the complete [WireRoute code-signing policy](CODE_SIGNING_POLICY.md).
 Download the release's `WireRoute-<version>-SHA256SUMS.txt` file and calculate the artifact's SHA-256 hash in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath .\WireRoute-x64-1.1.2.msi
+Get-FileHash -Algorithm SHA256 -LiteralPath .\WireRoute-x64-1.1.3.msi
 ```
 
 Compare the complete hexadecimal value with the matching line in the manifest. A checksum detects a damaged or substituted download but does not establish publisher identity; publisher and signing-certificate verification will require a future publicly trusted Authenticode signing process.
