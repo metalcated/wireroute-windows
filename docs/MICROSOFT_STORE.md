@@ -20,7 +20,7 @@ Prepare the native backend, then build unsigned development packages:
 .\scripts\Build-WireRouteStorePackage.ps1
 ```
 
-The output is written below `installer\dist\store\1.1.1.0\development`. An unsigned package cannot be installed directly. Local installation testing requires a development certificate whose subject matches the manifest publisher and whose public certificate is trusted on the test machine.
+The output is written below `installer\dist\store\1.1.2.0\development`. An unsigned package cannot be installed directly. Local installation testing requires a development certificate whose subject matches the manifest publisher and whose public certificate is trusted on the test machine.
 
 Every build runs `scripts\Test-WireRouteStorePackage.ps1`. The validator opens each package without installing it and verifies the manifest identity, full-trust entry point, framework dependency, capabilities, visual assets, application/backend placement, and x64 or ARM64 PE architecture.
 
@@ -38,7 +38,7 @@ Create Store-upload artifacts only after those values are available:
 
 ```powershell
 .\scripts\Build-WireRouteStorePackage.ps1 `
-  -Version 1.1.1.0 `
+  -Version 1.1.2.0 `
   -StoreUpload `
   -PackageIdentityName '<Partner Center identity name>' `
   -PackagePublisher '<Partner Center publisher>' `
@@ -46,7 +46,7 @@ Create Store-upload artifacts only after those values are available:
 ```
 
 The script rejects `-StoreUpload` when either development identity value is still present.
-Store-upload output is isolated below `installer\dist\store\1.1.1.0\store-upload`, so it cannot be confused with development-identity packages.
+Store-upload output is isolated below `installer\dist\store\1.1.2.0\store-upload`, so it cannot be confused with development-identity packages.
 
 ## Runtime model
 

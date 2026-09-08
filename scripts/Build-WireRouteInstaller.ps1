@@ -9,7 +9,7 @@ param(
     [string] $SourceDirectory,
 
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version = '1.1.1',
+    [string] $Version = '1.1.2',
 
     [string] $SigningCertificateThumbprint,
 

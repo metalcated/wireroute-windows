@@ -17,11 +17,9 @@ Native releases are produced independently for x64 and ARM64. x86 emulation is n
 
 ## Code signing
 
-WireRoute is applying for sponsored open-source code signing through SignPath Foundation. Until the application is accepted and the verified release pipeline is active, published Windows artifacts remain unsigned and should be checked against the SHA-256 manifest included with each release.
+Published Windows artifacts remain unsigned and should be checked against the SHA-256 manifest included with each release. Publicly trusted code signing is not currently configured; WireRoute does not currently have an active signing sponsorship.
 
-The repository's GitHub Actions workflow continuously validates `main` and can build both release architectures on demand. Before SignPath activation, its publishing path is deliberately limited to clearly marked unsigned pre-releases.
-
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
+The repository's GitHub Actions workflow continuously validates `main` and can build both release architectures on demand. Its publishing path is deliberately limited to clearly marked unsigned pre-releases. Microsoft Store registration is a separate process and does not block these GitHub releases.
 
 ## Current capabilities
 
@@ -52,7 +50,7 @@ go test ./tunnel ./manager ./driver
 Build the native x64 and ARM64 backends, self-contained WinUI applications, MSI installers, portable ZIPs, and SHA-256 manifest with:
 
 ```powershell
-.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.1
+.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.2
 ```
 
 Pass `-SigningCertificateThumbprint` to sign release binaries and installers with a certificate in the Windows certificate store. Output is written to `installer\dist`.

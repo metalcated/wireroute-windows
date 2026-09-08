@@ -82,17 +82,17 @@ Closing the main window leaves WireRoute in the notification area. In default mo
 After native resources have been prepared, create both architectures, MSI installers, portable ZIPs, and the checksum manifest:
 
 ```powershell
-.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.1
+.\scripts\Build-WireRouteRelease.ps1 -Version 1.1.2
 ```
 
 Outputs are written to `installer\dist`:
 
 ```text
-WireRoute-x64-1.1.1.msi
-WireRoute-x64-1.1.1.zip
-WireRoute-ARM64-1.1.1.msi
-WireRoute-ARM64-1.1.1.zip
-WireRoute-1.1.1-SHA256SUMS.txt
+WireRoute-x64-1.1.2.msi
+WireRoute-x64-1.1.2.zip
+WireRoute-ARM64-1.1.2.msi
+WireRoute-ARM64-1.1.2.zip
+WireRoute-1.1.2-SHA256SUMS.txt
 ```
 
 `Build-WireRouteInstaller.ps1` can build one MSI from an already staged application directory. `Publish-WireRouteApp.ps1` and `Build-WireRouteInstaller.ps1` are lower-level helpers; the release script is the canonical full build.
@@ -100,7 +100,7 @@ WireRoute-1.1.1-SHA256SUMS.txt
 Validate that all expected files exist, the MSI and ZIP containers are readable, and every payload matches the checksum manifest:
 
 ```powershell
-.\scripts\Test-WireRouteRelease.ps1 -Version 1.1.1
+.\scripts\Test-WireRouteRelease.ps1 -Version 1.1.2
 ```
 
 ## GitHub Actions release workflow
@@ -111,7 +111,7 @@ The manual run accepts a numeric `x.y.z` version and a separate **Publish the un
 
 The canonical release path is an annotated `vX.Y.Z` tag on a commit reachable from `main`. Pushing that tag runs the same verification and packaging jobs, derives the product version from the tag, and publishes the validated files as the unsigned pre-release. The workflow rejects malformed tags, tags outside `main` history, and an existing GitHub Release for the version.
 
-Until the SignPath Foundation application is accepted and the signing workflow is active, this pipeline intentionally cannot publish a stable or signed release. The production signing stage will be added between validation and release publication and will retain the existing manual-approval boundary.
+Until a publicly trusted signing identity and verified signing workflow are in place, this pipeline intentionally cannot publish a stable or signed release. A future production signing stage must retain the existing manual-approval boundary. Microsoft Store registration is separate from this unsigned GitHub release process.
 
 ## Signing
 
@@ -119,13 +119,13 @@ For a certificate available to SignTool through the Windows certificate store, p
 
 ```powershell
 .\scripts\Build-WireRouteRelease.ps1 `
-    -Version 1.1.1 `
+    -Version 1.1.2 `
     -SigningCertificateThumbprint YOUR_CERTIFICATE_THUMBPRINT
 ```
 
 The default RFC 3161 timestamp service is `https://timestamp.digicert.com` and can be replaced with `-TimestampServer` using another HTTPS URL.
 
-The current local signing path signs `WireRoute.exe`, `WireRoute.dll`, the native `wireguard.exe`, and each MSI. Production signing may instead be performed by the approved SignPath pipeline described in [Code-signing policy](CODE_SIGNING_POLICY.md). In either path, verify signatures on the final staged files and MSI rather than assuming that a successful build produced signed artifacts.
+The optional local signing path signs `WireRoute.exe`, `WireRoute.dll`, the native `wireguard.exe`, and each MSI when an appropriate certificate is supplied. No production signing provider is currently configured. A future signing pipeline must follow [Code-signing policy](CODE_SIGNING_POLICY.md). Verify signatures on the final staged files and MSI rather than assuming that a successful build produced signed artifacts.
 
 ## Installer behavior
 
