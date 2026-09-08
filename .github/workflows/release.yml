@@ -14,7 +14,7 @@ on:
       version:
         description: Release version in x.y.z format
         required: true
-        default: 1.1.1
+        default: 1.1.2
         type: string
       publish_prerelease:
         description: Publish the unsigned artifacts as a GitHub pre-release
@@ -187,7 +187,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.package.outputs.version }}
           RELEASE_NOTES: |
             > [!WARNING]
-            > These preview installers and portable archives are unsigned. Windows cannot yet verify WireRoute as the publisher. Verify downloads against the attached SHA-256 manifest. Signed stable releases will begin only after the SignPath Foundation release pipeline is approved and active.
+            > These preview installers and portable archives are unsigned. Windows cannot yet verify WireRoute as the publisher. Verify downloads against the attached SHA-256 manifest. Publicly trusted code signing is not currently configured. Microsoft Store registration is separate from these GitHub downloads.
         run: |
           set -euo pipefail
           tag="v${RELEASE_VERSION}"

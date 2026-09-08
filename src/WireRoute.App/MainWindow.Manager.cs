@@ -217,6 +217,23 @@ public sealed partial class MainWindow
 
     private async Task ToggleLocalProfileAsync(ProfileNavigationItem item)
     {
+        PauseAutomaticProfilesForManualControl();
+        if (item.StoredProfile is null) return;
+        var observedState = localTunnelController.GetState(item.StoredProfile.TunnelName);
+        if (observedState is not (LocalTunnelState.Active or LocalTunnelState.Inactive)) return;
+        await onDemandGate.WaitAsync();
+        try
+        {
+            // A queued click expresses an intent, not a request to invert any
+            // state that an in-flight automatic operation happens to produce.
+            if (localTunnelController.GetState(item.StoredProfile.TunnelName) == observedState)
+                await ChangeLocalProfileStateAsync(item);
+        }
+        finally { onDemandGate.Release(); }
+    }
+
+    private async Task ChangeLocalProfileStateAsync(ProfileNavigationItem item, bool automatic = false)
+    {
         if (item.StoredProfile is null)
         {
             return;
@@ -266,6 +283,7 @@ public sealed partial class MainWindow
         catch (OperationCanceledException exception)
         {
             item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
+            if (automatic) throw;
             await RecordActivityAsync(
                 WireRouteActivityKind.TunnelError,
                 item,
@@ -276,6 +294,7 @@ public sealed partial class MainWindow
         catch (Exception exception)
         {
             item.UpdateState(localTunnelController.GetState(item.StoredProfile.TunnelName));
+            if (automatic) throw;
             await RecordActivityAsync(
                 WireRouteActivityKind.TunnelError,
                 item,
@@ -312,6 +331,19 @@ public sealed partial class MainWindow
     }
 
     private async Task ToggleManagerProfileAsync(ProfileNavigationItem item)
+    {
+        PauseAutomaticProfilesForManualControl();
+        var observedState = item.ManagerState;
+        if (observedState is not (ManagerTunnelState.Started or ManagerTunnelState.Stopped)) return;
+        await onDemandGate.WaitAsync();
+        try
+        {
+            if (item.ManagerState == observedState) await ChangeManagerProfileStateAsync(item);
+        }
+        finally { onDemandGate.Release(); }
+    }
+
+    private async Task ChangeManagerProfileStateAsync(ProfileNavigationItem item)
     {
         if (item.ManagerName is null || managerClient is null)
         {

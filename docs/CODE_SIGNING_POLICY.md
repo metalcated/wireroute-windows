@@ -2,9 +2,9 @@
 
 ## Status
 
-WireRoute is applying for the SignPath Foundation open-source code-signing program. Public artifacts are not represented as SignPath-signed until the application is accepted, the verified release pipeline is active, and the individual artifact has a valid Authenticode signature issued in the name of SignPath Foundation.
+WireRoute does not currently have an active code-signing sponsorship or publicly trusted signing identity. The SignPath Foundation application was not accepted, and its proposed signing integration is not active. GitHub releases remain explicitly labeled unsigned previews. Microsoft Store registration is a separate process.
 
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
+The requirements below describe the boundary for a future approved signing integration, not an existing signing service. No artifact may be represented as signed unless its final Authenticode signature is valid and matches the approved publisher identity.
 
 ## Source and release boundary
 
@@ -13,9 +13,9 @@ Free code signing provided by [SignPath.io](https://signpath.io/), certificate b
 - Official downloads: [GitHub Releases](https://github.com/metalcated/wireroute-windows/releases)
 - Supported Windows architectures: x64 and ARM64
 
-Release artifacts submitted for Foundation signing must be produced by a reviewed workflow stored in this repository and executed on GitHub-hosted runners. SignPath trusted-build and origin verification must bind the artifact to this repository, branch or release tag, commit, and workflow run.
+Release artifacts submitted for signing must be produced by a reviewed workflow stored in this repository and executed on GitHub-hosted runners. Provenance verification must bind the artifact to this repository, branch or release tag, commit, and workflow run.
 
-Every release signing request requires manual approval. Local builds, pull-request builds, and artifacts produced outside the verified release workflow must not use the Foundation release certificate.
+Every release signing request requires manual approval. Local builds, pull-request builds, and artifacts produced outside the verified release workflow must not use a production release signing identity.
 
 ## Signing roles
 
@@ -27,9 +27,9 @@ External contributions require review by the maintainer before they can enter a 
 ## Artifact policy
 
 - The x64 and ARM64 MSI installers and WireRoute-maintained Windows binaries are the intended signed artifacts.
-- Product-name and product-version metadata must be consistent across each release and enforced by the SignPath artifact configuration.
-- Only binaries that SignPath Foundation approves as maintained by WireRoute may receive the Foundation signature.
-- Third-party and upstream binaries are not re-signed with WireRoute's Foundation policy. They retain their upstream signatures or remain included without a WireRoute signature as permitted by Foundation policy.
+- Product-name and product-version metadata must be consistent across each release and verified before signing.
+- Only binaries maintained by WireRoute and approved under the selected provider's policy may receive its release signature.
+- Third-party and upstream binaries retain their existing signatures and must not be re-signed as WireRoute-maintained artifacts without explicit review and approval.
 - Release downloads include SHA-256 hashes so users can verify transport and mirror integrity independently of Authenticode.
 
 ## Privacy and security

@@ -14,11 +14,9 @@ The MSI is the recommended installation format. Portable ZIPs are provided for d
 
 ## Code-signing status
 
-WireRoute is applying for the SignPath Foundation open-source code-signing program. Until the application is accepted and the verified release pipeline is active, release artifacts remain unsigned. A release is represented as signed only when Windows reports a valid Authenticode signature issued in the name of SignPath Foundation.
+WireRoute does not currently have an active code-signing sponsorship or publicly trusted signing identity. Release artifacts remain unsigned. A future release will be represented as signed only after its final artifacts pass Authenticode verification against the approved publisher identity.
 
-During this interim period, the reviewed GitHub Actions workflow can publish only an explicitly labeled **unsigned pre-release**. Stable signed releases remain disabled until the SignPath signing and approval stage is active.
-
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by SignPath Foundation.
+During this interim period, the reviewed GitHub Actions workflow can publish only an explicitly labeled **unsigned pre-release**. Microsoft Store registration is separate and does not prevent publishing GitHub previews. There is no claim that these downloads are Microsoft Store-signed.
 
 See the complete [WireRoute code-signing policy](CODE_SIGNING_POLICY.md).
 
@@ -27,9 +25,9 @@ See the complete [WireRoute code-signing policy](CODE_SIGNING_POLICY.md).
 Download the release's `WireRoute-<version>-SHA256SUMS.txt` file and calculate the artifact's SHA-256 hash in PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 -LiteralPath .\WireRoute-x64-1.1.1.msi
+Get-FileHash -Algorithm SHA256 -LiteralPath .\WireRoute-x64-1.1.2.msi
 ```
 
-Compare the complete hexadecimal value with the matching line in the manifest. A checksum detects a damaged or substituted download but does not establish publisher identity; Authenticode provides publisher and signing-certificate verification after the SignPath release process is active.
+Compare the complete hexadecimal value with the matching line in the manifest. A checksum detects a damaged or substituted download but does not establish publisher identity; publisher and signing-certificate verification will require a future publicly trusted Authenticode signing process.
 
 Download WireRoute only from this repository's release page or a future distribution location linked from this repository.

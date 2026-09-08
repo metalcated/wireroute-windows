@@ -170,6 +170,7 @@ public sealed partial class MainWindow : Window
                     // Leave malformed protected entries untouched for a future recovery flow.
                 }
             }
+            automaticProfilesLoaded = true;
             await EvaluateOnDemandAsync();
 
             if (ProfilesList.SelectedItem is null && Profiles.Count > 0)
@@ -406,15 +407,7 @@ public sealed partial class MainWindow : Window
             peer.PersistentKeepalive is null or 0
                 ? "Off"
                 : "every " + peer.PersistentKeepalive.Value + " seconds"));
-        ProfileOnDemandText.Text = item.StoredProfile is null
-            ? "Off"
-            : item.StoredProfile.OnDemandEthernet || item.StoredProfile.OnDemandWiFi
-                ? string.Join(", ", new[]
-                {
-                    item.StoredProfile.OnDemandEthernet ? "Ethernet" : null,
-                    item.StoredProfile.OnDemandWiFi ? "Wi-Fi" : null,
-                }.Where(value => value is not null))
-                : "Off";
+        UpdateProfileOnDemandSummary(item);
         UpdateProfilePolicyControls(item, profile);
         HooksWarningBorder.Visibility = profile.Interface.HasHooks ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -480,7 +473,7 @@ public sealed partial class MainWindow : Window
             peer.PersistentKeepalive is null or 0
                 ? "Off"
                 : "every " + peer.PersistentKeepalive.Value + " seconds"));
-        ProfileOnDemandText.Text = "Off";
+        UpdateProfileOnDemandSummary(item);
         SetRouteSegmentState(profile.DetectedRouteMode == TunnelRouteMode.Full);
         ProfileRoutingHelpText.Text = profile.DetectedRouteMode == TunnelRouteMode.Full
             ? "Full tunnel sends all supported traffic through the VPN."

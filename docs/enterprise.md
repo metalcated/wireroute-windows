@@ -14,13 +14,13 @@ WireRoute-ARM64-<version>.msi
 A quiet installation can use standard Windows Installer options:
 
 ```powershell
-msiexec.exe /i WireRoute-x64-1.1.1.msi /qn /norestart
+msiexec.exe /i WireRoute-x64-1.1.2.msi /qn /norestart
 ```
 
 A quiet uninstall can use the deployed MSI or its product code:
 
 ```powershell
-msiexec.exe /x WireRoute-x64-1.1.1.msi /qn /norestart
+msiexec.exe /x WireRoute-x64-1.1.2.msi /qn /norestart
 ```
 
 The package installs under Program Files and creates a Start menu shortcut. It does not automatically launch WireRoute and currently defines no product-specific MSI policy properties. Same-version upgrades are allowed; downgrades are blocked. x64 and ARM64 packages have separate upgrade identities, so deploy only the native package for each device.
@@ -64,6 +64,10 @@ Persistent VPN requires Profile DNS. WireRoute's encrypted DNS mode depends on a
 ### On-Demand
 
 Ethernet and Wi-Fi On-Demand selections are evaluated by the signed-in WireRoute application. They are convenient user-session automation, not a pre-logon machine policy and not a replacement for Persistent VPN.
+
+The Profiles sidebar and each profile's On-Demand action offer [Automatic profiles](AUTOMATIC_PROFILES.md), with secondary access in Settings, following WireRoute Android's network-profile switching model. Enabling it pauses the saved single-profile rules. Disabling it does not silently resume them or disconnect the current tunnel. Only connections started by automatic switching in the current app session can be switched; existing or manual connections are never adopted.
+
+Automatic profiles retains the same per-operation Windows elevation requirement. It is not an unattended privileged service or a kill switch. Rules run only while the signed-in tray application is running. Unknown active virtual adapters conservatively prevent switching; this can also affect virtual-machine, Hyper-V, or WSL networking. Wi-Fi rules use exact connected names, not Windows network display names, and do not authenticate a trusted network.
 
 ## Administrative boundaries
 

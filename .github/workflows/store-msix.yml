@@ -49,7 +49,7 @@ permissions:
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
   DOTNET_NOLOGO: true
-  STORE_VERSION: 1.1.1.0
+  STORE_VERSION: 1.1.2.0
 
 jobs:
   package:
