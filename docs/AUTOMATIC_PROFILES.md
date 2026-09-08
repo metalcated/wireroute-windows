@@ -7,7 +7,7 @@ Open **Profiles → Automatic profiles** in the sidebar. This Windows feature fo
 Automatic profiles is an enhancement of On-Demand, not a separate Settings-only feature:
 
 - The **Automatic profiles** button above the sidebar profile list is always available and shows whether the feature is on or off.
-- Each locally saved profile has an **On-Demand** action below DNS Protection. While automatic mode is enabled, it shows **Automatic profile switching** and opens that configuration directly.
+- Each locally saved profile has an **On-Demand** action below DNS Protection. While automatic mode is enabled, the button reads **Automatic profiles** and opens that configuration directly; otherwise it reads **Configure**. The shorter label reduces the button's width without changing its normal height, text size, or padding. The full status remains in Configuration details and the button tooltip.
 - With automatic mode off, the action opens the profile's single-profile Ethernet/Wi-Fi rules. Choose **Switch profiles by network…** to open Automatic profiles.
 - **Edit configuration → On-Demand → Configure…** uses the same flow instead of the old inline checkboxes. Returning from a child screen restores the existing editor, including its unsaved name, configuration, and rule draft. Saving single-profile rules here updates only the editor draft until the configuration is saved; Cancel/Discard on the configuration discards those edits.
 - **Settings → Automatic profiles → Configure automatic profiles** remains a secondary entry point.
@@ -55,7 +55,7 @@ Switching briefly disconnects the VPN and **is not a kill switch**. Full-tunnel 
 
 ## Existing On-Demand and Persistent VPN
 
-Enabling automatic profiles pauses the saved Ethernet/Wi-Fi single-profile On-Demand rules without deleting them. The profile detail and editor On-Demand buttons then display **Automatic profile switching** and open the automatic settings directly. If automatic mode is enabled from an already-open single-profile dialog, its saved checkboxes are disabled and labeled as paused when you return.
+Enabling automatic profiles pauses the saved Ethernet/Wi-Fi single-profile On-Demand rules without deleting them. The profile detail button reads **Automatic profiles**, while the editor retains the full **Automatic profile switching** label; both open the automatic settings directly. If automatic mode is enabled from an already-open single-profile dialog, its saved checkboxes are disabled and labeled as paused when you return.
 
 Disabling automatic mode does **not** silently reactivate the old rules. Select **Resume saved single-profile On-Demand rules when automatic profiles are off** in Automatic profiles, or **Resume saved single-profile On-Demand rules** in a profile's On-Demand screen, and save. Resuming applies to all saved single-profile rules. A normal profile edit or changing a network checkbox alone does not resume paused rules. A later automatic-settings save clears an earlier, unsaved request to resume, so an old editor draft cannot override the newer mode choice.
 

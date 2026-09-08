@@ -15,7 +15,9 @@ public sealed partial class MainWindow
             : new ProfileOnDemandDraft(stored.OnDemandEthernet, stored.OnDemandWiFi)
                 .Summary(appSettings.AutomaticProfiles.Enabled, appSettings.SingleProfileOnDemandSuspended);
         ProfileOnDemandText.Text = summary;
-        ProfileOnDemandActionText.Text = summary == "Off" ? "Configure…" : summary + "…";
+        ProfileOnDemandActionText.Text = stored is not null && appSettings.AutomaticProfiles.Enabled
+            ? "Automatic profiles" : "Configure";
+        ToolTipService.SetToolTip(ProfileOnDemandButton, summary);
     }
 
     private async void ProfileOnDemandButton_Click(object sender, RoutedEventArgs e)

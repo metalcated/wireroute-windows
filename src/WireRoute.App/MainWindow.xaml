@@ -369,7 +369,7 @@
                                 </StackPanel>
                                 <Button x:Name="ProfileOnDemandButton" Grid.Column="1" Click="ProfileOnDemandButton_Click" AutomationProperties.Name="Configure On-Demand">
                                     <StackPanel Orientation="Horizontal" Spacing="7">
-                                        <TextBlock x:Name="ProfileOnDemandActionText" Text="Configure…" />
+                                        <TextBlock x:Name="ProfileOnDemandActionText" Text="Configure" />
                                         <FontIcon FontSize="12" Glyph="&#xE76C;" />
                                     </StackPanel>
                                 </Button>
